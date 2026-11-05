@@ -84,16 +84,37 @@ Built Build Queue item A (the notation engine and ADV/DIS upgrade) in `script.js
 
 ## Build Queue
 
+Build the two items below in this order: the tens-dice notation first, then the keypad.
+
+### Percentile tens-dice notation (`d100tN`) and plain-words bonus/penalty text
+
+**Not yet authorized to build.**
+
+Adds game-neutral notation for rolling several tens dice on a d100, and makes bonus/penalty rolls say in plain words what they kept. Engine and display text in `script.js` only.
+
+- [ ] **Explicit form:** `d100tNkl` rolls N tens dice (N from 2 to 11) with one shared ones die, and keeps the lowest result; `d100tNkh` keeps the highest. Examples: `d100t2kl`, `d100t3kh`. Also works with `d%`.
+- [ ] **How it picks:** each tens die is paired with the ones die and compared by its final result, with `00` and `0` counting as 100 (the same rule bonus/penalty already use). Exactly one tens die must be kept: `kl` or `kh` (or `k`, which means `kh`), or `dh` / `dl` with N-1; anything else is an error ("keep exactly one tens die").
+- [ ] **Single d100 only:** `2d100t2kl` is an error, as `2d100b` is. `tN` cannot be combined with `b` or `p` (error). `d100t3` with no keep/drop is an error with a hint ("like d100t3kl").
+- [ ] **Shortcuts kept:** `d100b` is the same as `d100t2kl`, `d100bN` is the same as `d100t(N+1)kl`, `d100p` is the same as `d100t2kh`, `d100pN` is the same as `d100t(N+1)kh`. They stay available for Call of Cthulhu players.
+- [ ] **Plain-words roll text:** the text for these rolls says what was kept. Bonus or `kl`: `1d100b[tens (50),20,(70) keep lowest; ones 4] = 24`. Penalty or `kh`: `... keep highest ...`. Explicit form: `1d100t3kl[tens (50),20,(70) keep lowest; ones 4] = 24`. This text also appears in the history list.
+- [ ] **Errors:** new messages in the existing plain-English style for each case above.
+- [ ] **ADV / DIS cursor detection:** `termAt` is updated so a `d100tNkl` term is recognized as one dice term at the cursor.
+- [ ] **No display change:** dropped tens dice are dimmed as they already are for bonus and penalty.
+- [ ] **Files:** `script.js` only. Cache-bust: script.js?v=3→4.
+
+Verification plan (targeted, about 1 minute), forced dice values for exact results: `d100t2kl` and `d100b` give the same result for the same dice, `d100t2kh` and `d100p` likewise; `d100t3kl` with tens 50, 20, 70 and ones 4 gives 24 and `d100t3kh` gives 74; the `00` with `0` case (tens 00 and 30, ones 0: kl gives 30, kh gives 100); `dh2` / `dl2` forms with `t3`; every error (single d100 only, `t` with `b`, no keep/drop, keeping more than one, N out of range); the new "keep lowest" and "keep highest" wording in the roll text and the history; ADV/DIS on a `d100t3kl` term gives `(d100t3kl, d100t3kl)kh1`; the existing `b` / `p` results unchanged; zero JS errors.
+
 ### Expression Builder (on-screen keypad for the dice notation box)
 
-**Not yet authorized to build.** The notation it builds is already in place (Build Log 4).
+**Not yet authorized to build.** The notation it builds is in place (Build Log 4); it ships after the tens-dice item above so the keys match.
 
 Replaces the current die-button grid in the dice tray with a keypad that builds the expression in the notation box without the phone keyboard. Calculator-style: every key inserts exactly what it says.
 
 - [ ] **Dice keys (top):** d2, d4, d6, d8, d10, d12, d20, d30, d100, plus a `d` key. They insert `d2`, `d4`, ... `d100`, and `d`. Tapping `2` then `d6` gives `2d6`; `d6` alone gives `d6` (one die). Custom dice come from the `d` key plus digits (`1`, `d`, `7`).
 - [ ] **Digit keys:** 1 2 3 4 5 6 7 8 9 0.
 - [ ] **Operator keys:** `+`, `-`, `×`, `÷`, `(`, `)`. Multiply and divide show `×` and `÷` but insert `*` and `/`. Labels are HTML entities in the markup so they do not depend on file encoding.
-- [ ] **Notation keys:** `,` (group separator), `!` (explode), `B` and `P` (insert `b` and `p`, for bonus/penalty percentile dice), `MIN` and `MAX` (insert `min` and `max`).
+- [ ] **Notation keys:** `,` (group separator), `!` (explode), `B` and `P` (insert `b` and `p`, for bonus/penalty percentile dice), `T` (inserts `t`, the number of tens dice, as in `d100t3kl`), `MIN` and `MAX` (insert `min` and `max`).
+- [ ] **Plain-words caption:** a one-line caption under the keypad explains the percentile keys: "B = extra tens die, keep lowest. P = extra tens die, keep highest. T = number of tens dice, like d100t3kl."
 - [ ] **Keep/drop keys:** KH, KL, DH, DL (insert `kh`, `kl`, `dh`, `dl`).
 - [ ] **Quick button:** a full-width `4D6KH3` button that inserts `4d6kh3` at the cursor (no outer parentheses).
 - [ ] **DEL key:** deletes the selection, or the character before the cursor.
@@ -107,10 +128,10 @@ Replaces the current die-button grid in the dice tray with a keypad that builds 
 - [ ] **Stage shrinks:** the dice stage height drops from 230px to about 150px while the keypad is shown, to give the keys more room. (Decided with the user. Exact height to be tuned on the phone.)
 - [ ] **Easy to resize later:** key height, key gap and column counts are set through CSS custom properties (for example `--key-h`, `--key-gap`) in one place, so tightening the keys is a one-line change. The user expects to shrink the keys after seeing the first build (their phone keyboard has 10 keys across); the 32 x 32 px minimum stays unless they say otherwise.
 - [ ] **Key size (hard minimum):** every key is at least 32 x 32 CSS px. Target is 38 to 40px tall; widths come from the grid (about 62px with 5 columns and about 50px with 6 columns on a 360px-wide phone). The verification check measures every key's rendered size at 360px and 412px wide and fails the build if any key is under 32 x 32.
-- [ ] **Layout:** compact keys in a grid: two dice rows (d2 to d10, then d12, d20, d30, d100 and `d`), two digit rows (1 to 5, 6 to 0), an operator row (`+ − × ÷ ( )`), a notation row (`, ! B P MIN MAX`), a keep/drop row (KH KL DH DL DEL), and the quick button row. Risk: this is a tall keypad; the tray scrolls and ROLL stays sticky. Check on the phone.
-- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=3→4.
+- [ ] **Layout:** compact keys in a grid: two dice rows (d2 to d10, then d12, d20, d30, d100 and `d`), two digit rows (1 to 5, 6 to 0), an operator row (`+ − × ÷ ( )`), a notation row (`, ! B P T MIN MAX`, 7 keys), a keep/drop row (KH KL DH DL DEL), and the quick button row. Risk: this is a tall keypad; the tray scrolls and ROLL stays sticky. Check on the phone.
+- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=4→5 (assuming the tens-dice item above ships first).
 
-Verification plan (targeted, about 1 to 2 minutes): every key renders at least 32 x 32 px at 360px and 412px wide; key sequences produce the exact expected strings (`2`,`d6` → `2d6`; `4`,`d6`,`DL`,`1` → `4d6dl1`; `1`,`d`,`7` → `1d7`; `(`,`d8`,`,`,`d6`,`)`,`KH` → `(d8,d6)kh`; `d100`,`B` → `d100b`; the quick button; operator keys insert `* / + - ( )`); insertion in the middle of a string and replacing a selection; DEL on a character and on a selection; the keyboard toggle flips `inputmode`; a keypad-built expression rolls correctly; the delayed error message (hidden right after a key press, shown after the pause); old dX prompt and grid are gone; ROLL visible at 412x700 and 360x600; zero JS errors; a screenshot. **Needs a real-device check:** that `inputmode="none"` really suppresses the keyboard on Android Chrome, cursor behavior when tapping in the box, and key tap size and feel.
+Verification plan (targeted, about 1 to 2 minutes): every key renders at least 32 x 32 px at 360px and 412px wide; key sequences produce the exact expected strings (`2`,`d6` → `2d6`; `4`,`d6`,`DL`,`1` → `4d6dl1`; `1`,`d`,`7` → `1d7`; `(`,`d8`,`,`,`d6`,`)`,`KH` → `(d8,d6)kh`; `d100`,`B` → `d100b`; `d100`,`T`,`3`,`KL` → `d100t3kl`; the quick button; operator keys insert `* / + - ( )`); insertion in the middle of a string and replacing a selection; DEL on a character and on a selection; the keyboard toggle flips `inputmode`; a keypad-built expression rolls correctly; the delayed error message (hidden right after a key press, shown after the pause); old dX prompt and grid are gone; ROLL visible at 412x700 and 360x600; zero JS errors; a screenshot. **Needs a real-device check:** that `inputmode="none"` really suppresses the keyboard on Android Chrome, cursor behavior when tapping in the box, and key tap size and feel.
 
 ## Build Planner
 
