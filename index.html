@@ -4,7 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Micro VTT</title>
-    <link rel="stylesheet" href="styles.css?v=1">
+    <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -82,8 +82,41 @@
         <button id="hamburger" class="fab" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
         <div id="contextMenu"></div>
         <canvas id="battleMap"></canvas>
+
+        <button id="diceFab" class="dice-fab" aria-label="Open dice roller">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"/><polygon points="12,7.5 17,16 7,16" fill="none" stroke="#1a1a1a" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </button>
+
+        <div id="diceTray" aria-hidden="true">
+            <div class="dice-head"><h3>DICE ROLLER</h3><button id="diceClose" class="close-btn" aria-label="Close dice roller">[X]</button></div>
+            <div id="diceStage">
+                <canvas id="diceCanvas"></canvas>
+                <div id="diceTotal"></div>
+            </div>
+            <div id="diceText"></div>
+            <div id="diceMore"></div>
+            <div class="dice-body">
+                <input id="diceExpr" type="text" placeholder="3d6+2   4d6dl1   2d20kh1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Dice notation">
+                <div id="diceMsg"></div>
+                <div id="dicePad"></div>
+                <div class="dice-row">
+                    <div class="dice-mod">
+                        <button id="diceModMinus" class="dbtn" aria-label="Decrease modifier">&minus;</button>
+                        <input id="diceMod" type="number" value="0" min="-99" max="99" inputmode="numeric" aria-label="Modifier">
+                        <button id="diceModPlus" class="dbtn" aria-label="Increase modifier">+</button>
+                    </div>
+                    <button id="diceAdv" class="dbtn dbtn-wide">ADV</button>
+                    <button id="diceDis" class="dbtn dbtn-wide">DIS</button>
+                    <button id="diceClear" class="dbtn dbtn-wide">CLEAR</button>
+                </div>
+                <div id="dicePreview"></div>
+                <button id="diceRollBtn">ROLL</button>
+                <div class="dice-hist-head"><h3>HISTORY</h3><button id="diceHistClear" class="dbtn">CLEAR HISTORY</button></div>
+                <div id="diceHist"></div>
+            </div>
+        </div>
     </div>
 
-    <script src="script.js?v=1"></script>
+    <script src="script.js?v=2"></script>
 </body>
 </html>

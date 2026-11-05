@@ -15,31 +15,37 @@ Split the single-file app into three files so each part can be worked on separat
 
 **Verification:** a script that stitches `styles.css` and `script.js` back into `index.html` produced a result identical to `keep.html`. Playwright (Chromium, served locally) loaded `keep.html` and `index.html` side by side and compared the results: zero JS errors on both; all three files returned 200; splash fades to opacity 0; sidebar opens from the hamburger; Map and Help tabs switch; body background `rgb(17, 17, 17)`; 10 color swatches; canvas sized to the viewport. Screenshots of the two pages are identical. **Not verified here:** touch gestures (long-press to add a token, drag, pinch-zoom), folder loading and the calibration flow. These need a real-device check.
 
+## Build Log 2 (completed)
+### Dice roller with dice notation
+
+Built the animated dice roller and notation box from the Build Queue spec. Reuses the dice-notation parser logic the user supplied from QSheet, adapted into `script.js` (not stored as its own file).
+
+- [x] `index.html`: dice button (`#diceFab`, bottom-left) and a bottom tray (`#diceTray`) containing the stage canvas, total, roll text, notation box, die buttons, modifier, ADV/DIS/Clear, preview, ROLL, and history.
+- [x] `styles.css`: new "Dice Roller" section. Tray slides up from the bottom (z-index 1090, above the map, below the sidebar). Stage is 230px tall with a 44px strip kept clear for the total.
+- [x] `script.js`: new self-contained `(function () { ... })()` block before the final `window.onclick` line. No existing map, token or calibration code was changed.
+- [x] Engine: `rollDice(expr)` supports `NdS`, `d%`, `kh/kl/dh/dl`, `+ - * /`, parentheses and decimals. Every die is rolled with `crypto.getRandomValues` and rejection sampling (`randInt`). Returns `{ total, text, dice }` with each die's sides, value and kept/dropped flag. Limits: 20 dice per term, 50 per roll, 2 to 1000 sides. Plain-English error messages (`niceError`).
+- [x] Notation box is the source of truth. Die buttons (d2, d4, d6, d8, d10, d12, d20, d30, d100, dX) edit it: tapping a die you already have increments its count, otherwise appends `+1dS`. dX uses a prompt for 2 to 1000 sides. ROLL is disabled while the expression is empty or invalid, and the error shows live.
+- [x] Modifier (-99 to +99) is added at roll time. ADV/DIS roll `2d20kh1` / `2d20kl1` and are enabled only when the box is exactly one d20.
+- [x] Visuals: canvas-drawn dice with a distinct shape and color per type (d2 coin, d4 triangle, d6 rounded square, d8 diamond, d10/d100 kite, d12 pentagon, d20 hexagon with inner triangle, d30 and other sizes hexagon). Tumble with hops, flips and flickering numbers for about 1.2 seconds, then land with a pop. Dropped dice are dimmed. Up to 12 dice are animated; the rest appear as small chips. Kept d20 natural 20 gets a gold glow, particle burst, ring and stage flash with a gold total; natural 1 gets a red version. Reduced-motion devices get an instant result.
+- [x] History: last 10 rolls in `localStorage` key `vttDiceHistory`, with Clear History.
+- [x] Opening the tray also minimizes the sidebar so they do not overlap.
+- [x] Cache-bust bumped: styles.css?v=1→2, script.js?v=1→2.
+
+**Bugs found and fixed during verification:**
+- [x] Non-ASCII characters (the `···` rolling placeholder and the `×` / `÷` signs in roll text) rendered as garbage (`Â·`) because `index.html` has no charset declaration and `script.js` is now a separate file. Fixed by writing them as `\u` escapes in `script.js` so the app no longer depends on server or file encoding. Checks added for both signs.
+- [x] The big total overlapped the top-right die when many dice were rolled. Fixed by reserving a 44px strip at the top of the stage and raising the stage height from 200px to 230px.
+- [x] `doRoll` was rolling once to validate and again to roll. Removed the first roll; validity is already guaranteed by the disabled ROLL button.
+
+**Verification:** Playwright (Chromium, phone viewport 390x844, plus 360x640), 73 checks, all pass, zero JS errors.
+- Parser through the UI: precedence, parentheses, decimals, spaces and capitals, `d%`, and every error and limit message (`/0`, `1d1`, `1d1001`, 21 dice in a term, 51 in a roll, `2d6kh3`, `3d6 4`, trailing operator, 0 dice). 300 keep/drop rolls (`4d6dl1`, `2d20kh1`, `2d20kl1`, `4d6dh2`, `3d6kh2`) checked against their dice with zero mismatches.
+- Randomness: thousands of rolls through the real ROLL button for d2, d6, d20, d30 and d100. Every face appeared, nothing out of range, chi-square well under the p=0.001 limit for each.
+- UI: tray open/close, die-button editing (including d1/d10/d100 not colliding), dX accept and reject, modifier clamping at +/-99, ADV/DIS enable rules and math with forced dice values, nat 20 (gold) and nat 1 (red) via forced `crypto.getRandomValues` in the test harness, 20d6 showing 8 extra chips, Enter key, history cap of 10, survives reload, clears and stays cleared.
+- Regression: Build Log 1 checks (splash fade, sidebar, tabs, 10 swatches, canvas size) still pass. Screenshots reviewed for each die shape, the dimmed dropped dice, bursts, and the small-phone layout.
+- **Not verified here:** touch feel and animation smoothness on a real phone. Gold/red effects were checked in screenshots, not by eye in motion. Needs a real-device check.
+
 ## Build Queue
 
-### Dice roller (with dice notation)
-
-**Not yet authorized to build.**
-
-An animated dice roller that slides up from the bottom of the map screen, with a dice-notation text box. Offline, no libraries.
-
-- [ ] **Dice:** d2, d4, d6, d8, d10, d12, d20, d30, d100 (also `d%`), plus a custom "dX" button (user enters sides, 2 to 1000). d10 is 1 to 10. d100 is a single die, 1 to 100.
-- [ ] **Entry point:** a dice button on the map screen (bottom-left, so it doesn't collide with the hamburger at top-right). Tapping it opens a tray that slides up from the bottom, with a close button. Tray sits above the map and below the sidebar.
-- [ ] **Notation box (source of truth):** a text box in the tray holding the roll expression, e.g. `3d6+1d10+2d12kl1+3`. Spaces ignored, capitals fine. Supports `NdS` (N optional), `d%`, `kh`/`kl` (keep highest/lowest), `dh`/`dl` (drop highest/lowest) with an optional number (default 1), `+ - * /`, parentheses, plain numbers (decimals allowed), where `*` and `/` bind tighter than `+` and `-`. Not supported: exploding dice, rerolls, success counting.
-- [ ] **Engine:** the dice-notation parser is written into `script.js`, adapted from the user's QSheet `qsheet-dice.js` (supplied for reference; not stored in the repo as its own file). Changes from that file: (1) every die is rolled directly with `crypto.getRandomValues` using rejection sampling (no modulo bias), replacing the seeded generator; (2) the result also returns the individual dice (sides, value, kept or dropped) so the animation does not have to parse text; (3) the unneeded helpers (`heldRoll`, `abilityScores`) are left out. Result still includes the text form with dropped dice in parentheses, e.g. `3d6[4,2,5] + 2d12kl1[(9),3] + 3 = 19`.
-- [ ] **Limits:** 20 dice in one term, 50 in one roll, 2 to 1000 sides. *(Numbers chosen by Claude between the user's "10 is too small" and "100 is too many." Change before authorizing if wanted.)*
-- [ ] **Errors:** bad input or a limit breach shows the engine's plain-English reason (and fix, for limits) under the box. Nothing is rolled and nothing is added to history.
-- [ ] **Quick-add buttons:** a row of die buttons. Tapping one edits the box, increasing that die's count in the expression (e.g. tap d6 twice gives `2d6`; a different die appends `+1d4`). Typing in the box edits the same expression. A Clear button empties it.
-- [ ] **Modifier:** a separate -/+ field, integer -99 to +99. At roll time the expression becomes `(box)+mod` or `(box)-mod`; zero adds nothing. The tray shows this full expression before rolling.
-- [ ] **Advantage / disadvantage:** ADV and DIS buttons, enabled only when the box holds exactly one d20 (plus nothing else). They roll `2d20kh1` (ADV) or `2d20kl1` (DIS) with the modifier, with the discarded die dimmed. Typing `2d20kh1` by hand does the same thing. *(Scope detail chosen by Claude. Change before authorizing if wanted.)*
-- [ ] **Rolling:** a ROLL button runs the expression through the engine. Each result is decided first, then the animation lands on it, so the animation cannot skew a roll.
-- [ ] **Visuals:** dice drawn on canvas as polyhedron silhouettes (d2 as a coin, d4 triangle, d6 square, d8 diamond, d10/d100 kite-style, d12 pentagon, d20 triangle-in-hexagon, d30 and any other side count as a hexagon). They tumble and spin for about 1.2 seconds, then settle on the number. Dropped dice are dimmed. Up to 12 dice are animated individually; beyond that the rest appear as small settled numbers with no tumble. Total shown large. A kept d20 showing 20 gets a gold glow and particle burst; a kept d20 showing 1 gets a red flash. Animation is skipped (instant result) when the device prefers reduced motion.
-- [ ] **No sound, no vibration.**
-- [ ] **History:** last 10 rolls (expression, text form with every die, total, time) listed in the tray. Saved to `localStorage` so it survives a reload. A Clear History button.
-- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust bumped for each file changed, logged before and after.
-- [ ] No changes to existing map, token or calibration behavior.
-
-Verification plan: Playwright for zero JS errors; open and close the tray; the notation parser against a battery of good and bad expressions (precedence, parentheses, `kh/kl/dh/dl` including the keep/drop-count-too-large error, `d%`, `/0`, spaces and capitals, every limit and its message); quick-add buttons editing the box; modifier handling; ADV/DIS enable rules and keep-higher/lower math; custom dX bounds; RNG check over thousands of rolls per die (all faces reachable, roughly uniform, d2 and d30 included); history capped at 10 and persisted across reload; screenshots of each die shape, the dropped-dice dimming, and the 20/1 effects; re-run the Build Log 1 checks as a regression. **Needs a real-device check:** touch feel and animation smoothness on a phone.
+_Empty — nothing queued right now._
 
 ## Build Planner
 
