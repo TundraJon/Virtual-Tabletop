@@ -23,4 +23,32 @@ _Empty — nothing queued right now._
 
 Resolved, built, dropped, or superseded items are deleted from this section. Their history lives in the Build Log.
 
-_Empty — nothing backlogged right now._
+All items below are ideas only. None are designed, queued or authorized to build. Priority order is still to be decided.
+
+### Known gaps in the current app
+
+- **Mouse / desktop input:** the canvas only listens for touch events, so token placement, dragging, panning and zoom do nothing with a mouse. Open question: also add wheel zoom?
+- **Save and restore:** a reload wipes tokens, calibration and the selected map; only the folder names are remembered. Open questions: autosave to localStorage, export/import as a file, or both? Map and token images are blob URLs and can't be saved directly.
+- **Feet-per-square stored as a string:** `grid.ftPerSq = this.value` stores text, not a number. Distance math currently works by coercion. Log only; fix if/when authorized.
+- **Undo:** no way to undo a token move, delete or HP change.
+
+### Table features other VTTs do well
+
+- **Initiative tracker:** turn order, current-turn highlight, round counter. Open questions: manual entry or built-in roll? Tied to tokens?
+- **Conditions / status icons:** icons on tokens (stunned, prone, etc.). Open question: fixed list or user-defined?
+- **Fog of war:** GM reveals the map as players explore. Open questions: paint-to-reveal, grid-cell reveal, or both?
+- **Area templates:** cone, circle, line and cube overlays for spells and effects, snapped to the grid.
+
+### Innovative ideas
+
+- **True-size mode:** calibrate to the physical screen so one square equals exactly 1 inch, letting a tablet laid flat serve as a map for physical minis. Open question: how to calibrate (known device size, or a measure-with-a-ruler step)?
+- **Custom token stats:** replace the fixed HP bar with user-defined bars (stamina, morale, armor, etc.), keeping the app system-agnostic and suited to custom combat systems. Open questions: how many bars, and how are they defined?
+- **Player view:** a second screen (TV or tablet) shows the map and fog while the phone keeps the GM controls. Open question: how to link the screens with no server?
+- **Encounter presets:** save a map with its tokens, positions and HP as one file and reload it in one tap. Likely shares work with save and restore.
+- **Waypoint ruler:** measure a path with turns, and mark difficult terrain that costs extra movement.
+- **Installable offline app:** make it a PWA, then wrap it for Google Play. Needs the HTML/CSS/JS split (done) and a manifest and service worker.
+
+### Requested by Jon
+
+- **Character sheets:** basic character-sheet panels that expand up from the bottom of the screen. Open questions: system-agnostic fields or a template per game? Linked to map tokens?
+- **Dice roller:** a roller that looks cool (animated dice). Open questions: which dice (d4 through d100, custom)? 2D or 3D? Roll history? Modifiers? Accessible from the character sheet?
