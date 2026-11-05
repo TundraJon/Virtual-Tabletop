@@ -110,3 +110,6 @@
         #diceKeys .dkey.quick { color: #00ffcc; letter-spacing: 2px; }
         #diceKeys .dkey:active { background: #3a3a3a; }
         #diceKeyHint { margin: 8px 2px 0 2px; font-size: 10px; color: #777; line-height: 1.5; }
+
+        /* Board storage */
+        .grid-mem { font-size: 11px; text-align: center; color: #888; margin: 6px 0 2px 0; min-height: 14px; }

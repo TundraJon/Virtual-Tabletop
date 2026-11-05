@@ -6,7 +6,7 @@
         let calPoints = [null, null], currentMode = null, showPins = true;
         let isPinching = false, zoomCooldown = false, lastPinchDist = 0, lastPinchMid = {x:0, y:0}, touchStartPos = {x:0, y:0};
         let dragging = null, dragStartX = 0, dragStartY = 0, lastMove = null;
-        let gridColor = "0, 255, 204", menuTimer = null;
+        let gridColor = "0, 255, 204", menuTimer = null, curMapName = '';
 
         function init() {
             // Check persistence
@@ -84,7 +84,7 @@
         document.getElementById('inputMapDir').onchange = (e) => handleFolder(e, mapLib, 'map');
         document.getElementById('inputTokenDir').onchange = (e) => handleFolder(e, tokenLib, 'token');
 
-        function changeMap(n) { if(n.includes("First")) return; mapImg.src = mapLib[n]; calPoints=[null,null]; grid.size=0; mapImg.onload=fitToScreen; }
+        function changeMap(n) { if(n.includes("First")) return; mapImg.src = mapLib[n]; calPoints=[null,null]; grid.size=0; mapImg.onload = () => { curMapName = n; fitToScreen(); if (window.boardHooks) boardHooks.mapLoaded(n); }; }
         
         function fitToScreen() {
             if (!mapImg.width) return;
@@ -115,6 +115,7 @@
             grid.y2 = Math.max(calPoints[0].y, calPoints[1].y);
             grid.size = (grid.x2 - grid.x1) / (parseInt(document.getElementById('sqCount').value) || 1);
             showPins = false; currentMode = null; updateUI();
+            if (window.boardHooks) boardHooks.gridApplied();
         }
 
         function draw() {
@@ -973,6 +974,54 @@
             window.addEventListener('resize', redraw);
 
             renderHist(); refresh(); redraw();
+        })();
+
+        // ===== BOARD STORAGE: grid memory by map name =====
+        window.boardHooks = window.boardHooks || {};
+        (function () {
+            const GRIDS_KEY = 'vttGrids', MAX_GRIDS = 200;
+            const statusEl = document.getElementById('gridMemStatus');
+            const getAll = () => { try { const o = JSON.parse(localStorage.getItem(GRIDS_KEY)); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; } };
+            function putAll(o) { // keep at most MAX_GRIDS records, dropping the oldest; false if the browser refused to save
+                try {
+                    const keys = Object.keys(o);
+                    if (keys.length > MAX_GRIDS) keys.sort((a, b) => (o[a].t || 0) - (o[b].t || 0)).slice(0, keys.length - MAX_GRIDS).forEach(k => delete o[k]);
+                    localStorage.setItem(GRIDS_KEY, JSON.stringify(o)); return true;
+                } catch (e) { return false; }
+            }
+            let key = ''; // map file name plus pixel size, so a different image with the same name never gets this grid
+            const keyFor = (name, w, h) => name + '|' + w + 'x' + h;
+            const say = (t) => { statusEl.textContent = t; };
+            const okRec = (r) => r && [r.x1, r.y1, r.x2, r.y2, r.size, r.sq, r.ft].every(Number.isFinite) && Array.isArray(r.cal) && r.cal.length === 2 && r.cal.every(c => c && Number.isFinite(c.x) && Number.isFinite(c.y));
+
+            boardHooks.setMap = (name, w, h) => { key = keyFor(name, w, h); say(okRec(getAll()[key]) ? 'Saved grid loaded' : 'No saved grid for this map'); };
+            boardHooks.mapLoaded = (name) => {
+                key = keyFor(name, mapImg.naturalWidth, mapImg.naturalHeight);
+                const r = getAll()[key];
+                if (!okRec(r)) { say('No saved grid for this map'); return; }
+                grid.x1 = r.x1; grid.y1 = r.y1; grid.x2 = r.x2; grid.y2 = r.y2; grid.size = r.size;
+                calPoints = [{ x: r.cal[0].x, y: r.cal[0].y }, { x: r.cal[1].x, y: r.cal[1].y }];
+                document.getElementById('sqCount').value = r.sq;
+                document.getElementById('ftPerSq').value = r.ft; grid.ftPerSq = r.ft;
+                showPins = false; currentMode = null; updateUI(); say('Saved grid loaded');
+            };
+            boardHooks.gridApplied = () => {
+                if (!key || !(grid.size > 0) || !calPoints[0] || !calPoints[1]) return;
+                const o = getAll();
+                o[key] = { x1: grid.x1, y1: grid.y1, x2: grid.x2, y2: grid.y2, size: grid.size, cal: [{ x: calPoints[0].x, y: calPoints[0].y }, { x: calPoints[1].x, y: calPoints[1].y }], sq: parseInt(document.getElementById('sqCount').value, 10) || 1, ft: Number(grid.ftPerSq) || 5, t: Date.now() };
+                say(putAll(o) ? 'Grid saved for this map' : 'Grid applied (this browser would not save it)');
+            };
+            document.getElementById('ftPerSq').addEventListener('change', () => { // keep the saved feet-per-square in step
+                const o = getAll();
+                if (key && okRec(o[key])) { o[key].ft = Number(grid.ftPerSq) || 5; o[key].t = Date.now(); putAll(o); }
+            });
+            document.getElementById('btnForgetGrid').addEventListener('click', () => {
+                const o = getAll();
+                if (key && o[key]) { delete o[key]; putAll(o); }
+                grid.size = 0; calPoints = [null, null]; showPins = true; currentMode = null;
+                document.getElementById('sqDownDisplay').textContent = 'Squares Down: --';
+                updateUI(); say('No saved grid for this map');
+            });
         })();
 
         window.onclick = (e) => { if(e.target.tagName !== 'BUTTON' && !e.target.classList.contains('menu-item')) menu.style.display = 'none'; };

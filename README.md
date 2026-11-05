@@ -174,26 +174,24 @@ Requested: raise the dice roller card to almost touch the menu button and give t
 - Two first-run failures were arithmetic on my side (the 2px border put the top at 56px, and the stage borders add 2px); fixed before this entry.
 - **Needs a real-device check:** the gap under the menu button and the dice size on the phone.
 
+## Build Log 10 (completed)
+### Grid memory by map name
+
+Queue item A. Picking a map you have calibrated before now brings its grid back. No images are stored.
+
+- [x] `script.js`: new "BOARD STORAGE: grid memory" section (`window.boardHooks`). Records live in localStorage key `vttGrids`, keyed by the map's name (as shown in the dropdown) plus its pixel size (`name|WIDTHxHEIGHT`), so a different image with the same name never gets the wrong grid. Each record holds `x1`, `y1`, `x2`, `y2`, `size`, the two calibration points, squares across (`sq`), feet per square (`ft`) and a timestamp; at most 200 records, oldest dropped.
+- [x] Saves when APPLY GRID is pressed (`boardHooks.gridApplied`) and when FEET PER SQUARE changes while that map has a record. Loads after the map image finishes loading (`boardHooks.mapLoaded`): restores the grid, calibration points (SET TL / SET BR show as locked), the squares-across and feet fields and the squares-down display, and hides the pins. With no record, behavior is exactly as before. A record with bad numbers is ignored.
+- [x] Two small edits to existing code: `changeMap` now sets the map name and calls the hook once the image has loaded (the old `onload` still fits the map to the screen), and `applyCalibration` calls the hook at its end. A new top-level `curMapName` variable holds the loaded map's name. `boardHooks.setMap(name, w, h)` is there for the autosave build.
+- [x] `index.html` / `styles.css`: a status line (`#gridMemStatus`: "Saved grid loaded", "No saved grid for this map", "Grid saved for this map") and a FORGET GRID button in the Map tab. FORGET GRID deletes that map's record and clears the grid and the lock labels; recalibrating and pressing APPLY GRID overwrites the record.
+- [x] Every call to the new storage is in try/catch; when the browser refuses to save, the status says "Grid applied (this browser would not save it)".
+- [x] Cache-bust bumped: script.js?v=7→8, styles.css?v=7→8.
+
+**Verification:** Playwright (Chromium, 1000x600, real touch taps for calibration, small flat-color test maps), 20 checks, all pass, zero JS errors, 10 seconds. First pick shows no saved grid and no grid lines; calibrating (squares down 10, 9 squares across, 10 ft) saves and draws grid lines (checked on the canvas pixels); after a page reload the same map restores the grid, fields, locked labels and squares-down display; a different map and a same-named map of a different size get no grid; changed feet per square is remembered; recalibrating overwrites; FORGET GRID clears it and it stays forgotten after a reload; with the new keys blocked in storage the app works and says it could not save.
+- **Needs a real-device check:** calibration and the saved grid with real touches on the phone.
+
 ## Build Queue
 
-Build these in order: A, then B, then C. Nothing stores image libraries; only the current map, the tokens on the board, grid definitions and small state records are saved, all on the device.
-
-### A. Grid memory by map name
-
-**Not yet authorized to build.**
-
-When a map is picked, its grid comes back automatically if it was calibrated before. No images are stored.
-
-- [ ] **Key:** the map's file name (without extension, as it appears in the dropdown) plus the image's pixel size, `name|WIDTHxHEIGHT`, so a different image with the same name never gets the wrong grid.
-- [ ] **What is saved** (localStorage key `vttGrids`, one small record per key): the grid rectangle and size (`x1`, `y1`, `x2`, `y2`, `size`), the two calibration points, the squares-across number, and feet per square. Grid color stays a global setting. At most 200 records; the oldest is dropped past that.
-- [ ] **When it saves:** each time APPLY GRID is pressed, and when FEET PER SQUARE changes while the map has a grid.
-- [ ] **When it loads:** after a map image finishes loading in `changeMap`, if a record exists: restore the grid, calibration points (so SET TL and SET BR show as locked), the squares-across field, and feet per square; hide the pins; refresh the "Squares Down" display. With no record, behavior is exactly as today (grid reset, calibrate as usual).
-- [ ] **Status line** in the Map tab under APPLY GRID: "Saved grid loaded" or "No saved grid for this map". *(Added by Claude. Change before authorizing if wanted.)*
-- [ ] **FORGET GRID button** next to it: deletes that map's record and clears the grid, so a bad calibration can be redone. Recalibrating and pressing APPLY GRID also overwrites the record. *(Added by Claude. Change before authorizing if wanted.)*
-- [ ] **Safe by default:** every storage call is in try/catch and the app works without storage.
-- [ ] **Files:** `script.js`, `index.html` (status line and button), `styles.css` (small). Cache-bust: script.js?v=7→8, styles.css?v=7→8.
-
-Verification plan (targeted, about 2 minutes): load a test map folder, calibrate by tapping the corners, apply the grid with a squares-across number and feet per square, reload the page, load the same folder, pick the same map, and check the grid and fields come back (status text, the squares-down display, the squares-across and feet fields, and a canvas screenshot with grid lines); a different map gets no grid; a different-size image with the same name gets no grid; FORGET GRID clears it; recalibrating overwrites; storage disabled still works; zero JS errors. **Needs a real-device check:** calibration with real touches.
+Build these in order: B, then C (A is done, see Build Log 10). Nothing stores image libraries; only the current map, the tokens on the board, grid definitions and small state records are saved, all on the device.
 
 ### B. Autosave the board, with the current map and board tokens
 
@@ -239,6 +237,8 @@ All items below are ideas only. None are designed, queued or authorized to build
 - **Mouse / desktop input:** the canvas only listens for touch events, so token placement, dragging, panning and zoom do nothing with a mouse. Open question: also add wheel zoom?
 - **Feet-per-square stored as a string:** `grid.ftPerSq = this.value` stores text, not a number. Distance math currently works by coercion. Log only; fix if/when authorized.
 - **Undo:** no way to undo a token move, delete or HP change.
+- **Existing storage calls are not guarded:** `init()` and `handleFolder` read and write `localStorage` (`mapDirName`, `tokenDirName`, `mapCount`, `tokenCount`) with no try/catch, so in a browser that refuses storage the app errors at start. Found while testing grid memory; log only.
+- **Picking "-- SELECT MAP --" in the map dropdown:** `changeMap` sets the image to `undefined` and resets the grid (the "Set Location First" case is guarded, this one is not). Found while building grid memory; log only.
 
 ### Table features other VTTs do well
 

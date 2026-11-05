@@ -4,7 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Micro VTT</title>
-    <link rel="stylesheet" href="styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
@@ -49,6 +49,8 @@
                 <input type="number" id="sqCount" value="25" oninput="updateSqDown()" style="margin-top:10px;">
                 <div id="sqDownDisplay" style="font-size:11px; text-align:center; color:#00ffcc; margin-top:5px;">Squares Down: --</div>
                 <button class="action-btn" onclick="applyCalibration()" style="background:#00ffcc; color:#000; font-weight:bold;">APPLY GRID</button>
+                <div id="gridMemStatus" class="grid-mem"></div>
+                <button class="action-btn" id="btnForgetGrid" style="color:#ff8a7a;">FORGET GRID</button>
             </div>
             <div class="panel">
                 <h3>GRID SCALE</h3>
@@ -125,6 +127,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=8"></script>
 </body>
 </html>
