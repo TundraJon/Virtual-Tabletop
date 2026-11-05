@@ -56,7 +56,7 @@ A design settled in one sitting can skip the Planner and go straight to the Queu
 3. Drive the UI like a real user (click buttons, fill inputs, read the rendered DOM). Don't reach into internal JS state.
 4. Log each check with its expected value next to the actual value.
 5. Screenshot any visual claim.
-6. Re-run earlier scripts before calling a build done, to catch regressions.
+6. Only run tests directly affected by the change or that interact with it. No full regression runs for small changes. Keep tests under 3 minutes normally and about 1 minute for simple changes.
 7. Test realistic data, not just an empty app.
 8. **Reproduce a reported bug first.** Confirm the exact symptom fails, then find the root cause, fix it, and re-run the same reproduction.
 9. If something can't be verified here (real touch gestures, long-press, pinch, live network), say so explicitly and flag it for a real-device check. Don't silently skip it.

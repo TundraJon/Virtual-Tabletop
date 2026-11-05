@@ -49,8 +49,8 @@
         .help-section li { font-size: 12px; color: #ccc; margin-bottom: 8px; }
 
         /* Dice Roller */
-        .dice-fab { position: absolute; left: 15px; bottom: 15px; width: 44px; height: 44px; padding: 0; border-radius: 10px; background: #00ffcc; border: none; z-index: 1050; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 0 14px rgba(0,255,204,0.45); }
-        #diceTray { position: absolute; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 640px; max-height: 86vh; overflow-y: auto; background: #1c1c1c; border: 2px solid #00ffcc; border-bottom: none; border-radius: 16px 16px 0 0; z-index: 1090; visibility: hidden; transform: translateY(105%); transition: transform 0.3s ease, visibility 0s linear 0.3s; box-shadow: 0 -8px 30px rgba(0,0,0,0.7), 0 0 24px rgba(0,255,204,0.15); touch-action: pan-y; padding-bottom: env(safe-area-inset-bottom); }
+        .dice-fab { position: fixed; left: 15px; bottom: 15px; width: 44px; height: 44px; padding: 0; border-radius: 10px; background: #00ffcc; border: none; z-index: 1050; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 0 14px rgba(0,255,204,0.45); }
+        #diceTray { position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 640px; max-height: 86vh; max-height: 86dvh; overflow-y: auto; background: #1c1c1c; border: 2px solid #00ffcc; border-bottom: none; border-radius: 16px 16px 0 0; z-index: 1090; visibility: hidden; transform: translateY(105%); transition: transform 0.3s ease, visibility 0s linear 0.3s; box-shadow: 0 -8px 30px rgba(0,0,0,0.7), 0 0 24px rgba(0,255,204,0.15); touch-action: pan-y; padding-bottom: env(safe-area-inset-bottom); }
         #diceTray.open { visibility: visible; transform: translateY(0); transition: transform 0.3s ease, visibility 0s; }
         #diceTray .dice-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px 6px 15px; }
         #diceTray .dice-head h3 { margin: 0; }

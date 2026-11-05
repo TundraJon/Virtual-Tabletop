@@ -43,6 +43,20 @@ Built the animated dice roller and notation box from the Build Queue spec. Reuse
 - Regression: Build Log 1 checks (splash fade, sidebar, tabs, 10 swatches, canvas size) still pass. Screenshots reviewed for each die shape, the dimmed dropped dice, bursts, and the small-phone layout.
 - **Not verified here:** touch feel and animation smoothness on a real phone. Gold/red effects were checked in screenshots, not by eye in motion. Needs a real-device check.
 
+## Build Log 3 (completed)
+### Fix: dice button and tray off the bottom of the screen on Android Chrome
+
+Reported on Android Chrome: the dice button could not be seen. Cause: the button and tray were positioned against `#map-container`, which is `height: 100vh`. On Android Chrome `100vh` includes the area behind the address bar and bottom toolbar, so the container is taller than the visible screen and anything pinned to its bottom edge lands off-screen.
+
+- [x] `styles.css`: `.dice-fab` changed from `position: absolute` to `position: fixed`, so it anchors to the visible screen.
+- [x] `styles.css`: `#diceTray` changed from `position: absolute` to `position: fixed`, and `max-height: 86vh` now has a `max-height: 86dvh` line after it (browsers without `dvh` keep the `vh` value).
+- [x] Existing map layout (`#map-container`, the canvas, the hamburger) was not touched.
+- [x] Cache-bust bumped: styles.css?v=2→3 (script.js and index.html markup unchanged).
+
+**Verification:** reproduced first. Playwright with a simulated Android toolbar (container 120px taller than the visible screen) put the dice button 61px below the visible screen, and the tray and ROLL button also off-screen, at 412x780, 360x600 and 780x360. After the fix, the dice button and tray are fully on screen at all three sizes. Targeted re-check at 412x700 (8 checks, zero JS errors): new stylesheet version served, button on screen, tray on screen, ROLL on screen, a roll still works, tray closes, button still on screen after closing, hamburger sidebar still opens.
+- **Known limitation, not changed:** below about 700px of visible height (for example 360x600) the tray's content is taller than the tray, so ROLL is reached by scrolling inside the tray. At 412x700 and taller, ROLL is visible without scrolling.
+- **Needs a real-device check:** the simulation reproduces the symptom, but the real Chrome toolbar behavior should be confirmed on the phone.
+
 ## Build Queue
 
 _Empty — nothing queued right now._
