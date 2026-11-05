@@ -17,7 +17,25 @@ Split the single-file app into three files so each part can be worked on separat
 
 ## Build Queue
 
-_Empty — nothing queued right now._
+### Dice roller
+
+**Not yet authorized to build.**
+
+An animated dice roller that slides up from the bottom of the map screen. Offline, no libraries.
+
+- [ ] **Dice:** d2, d4, d6, d8, d10, d12, d20, d30, d100, plus a custom "dX" (user enters sides, 2 to 1000). d10 is 1 to 10. d100 is a single die, 1 to 100.
+- [ ] **Entry point:** a dice button on the map screen (bottom-left, so it doesn't collide with the hamburger at top-right). Tapping it opens a tray that slides up from the bottom, with a close button. Tray sits above the map and below the sidebar.
+- [ ] **Pool:** tapping a die type adds it to the pool; the pool shows as chips (e.g. 2d6, 1d20) and tapping a chip removes one of that die. A Clear button empties it. Cap of 10 dice total.
+- [ ] **Modifier:** integer from -99 to +99, added to the total.
+- [ ] **Advantage / disadvantage:** ADV and DIS toggles, enabled only when the pool is exactly one d20. Rolls two d20, keeps the higher (ADV) or lower (DIS), and shows the discarded die dimmed. *(Scope detail chosen by Claude. Change before authorizing if wanted.)*
+- [ ] **Rolling:** a ROLL button. Each result is chosen first with `crypto.getRandomValues` (rejection sampling, so no modulo bias), then the animation lands on it, so the animation cannot skew a roll.
+- [ ] **Visuals:** dice drawn on canvas as polyhedron silhouettes (d2 as a coin, d4 triangle, d6 square, d8 diamond, d10/d100 kite-style, d12 pentagon, d20 triangle-in-hexagon, d30 and custom as a hexagon). They tumble and spin for about 1.2 seconds, then settle on the number. Total shown large. Natural 20 on a d20 gets a gold glow and particle burst; natural 1 gets a red flash. Animation is skipped (instant result) when the device prefers reduced motion.
+- [ ] **Vibration:** `navigator.vibrate` short pulse on landing, longer pulse on natural 20/1. Silent no-op where unsupported (e.g. iOS Safari). No sound.
+- [ ] **History:** last 10 rolls (pool, modifier, individual dice, total, time) listed in the tray. Saved to `localStorage` so it survives a reload. A Clear History button.
+- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust bumped for each file changed, logged before and after.
+- [ ] No changes to existing map, token or calibration behavior.
+
+Verification plan: Playwright for zero JS errors; open and close the tray; pool add, remove, clear and the 10-dice cap; modifier limits; ADV/DIS enable rules and keep-higher/lower math; custom dX bounds; RNG distribution check over thousands of rolls per die (all faces reachable, roughly uniform); history capped at 10 and persisted across reload; mocked `navigator.vibrate` called; screenshots of each die and the 20/1 effects; re-run the Build Log 1 checks as a regression. **Needs a real-device check:** actual vibration, touch feel and animation smoothness on a phone.
 
 ## Build Planner
 
@@ -51,4 +69,3 @@ All items below are ideas only. None are designed, queued or authorized to build
 ### Requested by Jon
 
 - **Character sheets:** basic character-sheet panels that expand up from the bottom of the screen. Open questions: system-agnostic fields or a template per game? Linked to map tokens?
-- **Dice roller:** a roller that looks cool (animated dice). Open questions: which dice (d4 through d100, custom)? 2D or 3D? Roll history? Modifiers? Accessible from the character sheet?
