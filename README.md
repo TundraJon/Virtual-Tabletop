@@ -82,31 +82,25 @@ Built Build Queue item A (the notation engine and ADV/DIS upgrade) in `script.js
 - **Not verified here:** ADV/DIS follow the cursor through `selectionchange`; tapping inside the box on Android Chrome should be checked on the phone.
 - **Known, not changed:** the old die buttons (replaced by the keypad later) increment the first matching term, so tapping d100 while the box holds `d100b` makes `2d100b`, which shows the single-d100 error.
 
-## Build Queue
-
-Build the two items below in this order: the tens-dice notation first, then the keypad.
-
+## Build Log 5 (completed)
 ### Percentile tens-dice notation (`d100tN`) and plain-words bonus/penalty text
 
-**Not yet authorized to build.**
+Added game-neutral notation for rolling several tens dice on a d100, and made bonus/penalty rolls say what they kept. Engine and roll text in `script.js` only.
 
-Adds game-neutral notation for rolling several tens dice on a d100, and makes bonus/penalty rolls say in plain words what they kept. Engine and display text in `script.js` only.
+- [x] `d100tNkl` / `d100tNkh` (also `d%`): N tens dice (2 to 11) with one shared ones die; each tens die is paired with the ones die, compared by final result (`00`+`0` counts as 100), and exactly one is kept. `k` means `kh`; `dh` / `dl` work with N-1; `kl`, `kh` and the drop forms are all accepted.
+- [x] `d100b`, `d100bN`, `d100p`, `d100pN` kept as shortcuts and now share the same code path (`b` is `kl`, `p` is `kh`, with N+1 tens dice).
+- [x] Roll text says what was kept: `1d100t3kl[tens (50),20,(70) keep lowest; ones 4] = 24`, `... keep highest ...`; also in the history list.
+- [x] New errors: single d100 only, `t` with `b`/`p`, `t` with no keep/drop, keeping more than one tens die, N outside 2 to 11, `t` on a non-d100, `t` with no number.
+- [x] `termAt` regex recognizes `d100tNkl` as one dice term, so ADV/DIS convert it as a unit.
+- [x] Cache-bust bumped: script.js?v=3→4.
 
-- [ ] **Explicit form:** `d100tNkl` rolls N tens dice (N from 2 to 11) with one shared ones die, and keeps the lowest result; `d100tNkh` keeps the highest. Examples: `d100t2kl`, `d100t3kh`. Also works with `d%`.
-- [ ] **How it picks:** each tens die is paired with the ones die and compared by its final result, with `00` and `0` counting as 100 (the same rule bonus/penalty already use). Exactly one tens die must be kept: `kl` or `kh` (or `k`, which means `kh`), or `dh` / `dl` with N-1; anything else is an error ("keep exactly one tens die").
-- [ ] **Single d100 only:** `2d100t2kl` is an error, as `2d100b` is. `tN` cannot be combined with `b` or `p` (error). `d100t3` with no keep/drop is an error with a hint ("like d100t3kl").
-- [ ] **Shortcuts kept:** `d100b` is the same as `d100t2kl`, `d100bN` is the same as `d100t(N+1)kl`, `d100p` is the same as `d100t2kh`, `d100pN` is the same as `d100t(N+1)kh`. They stay available for Call of Cthulhu players.
-- [ ] **Plain-words roll text:** the text for these rolls says what was kept. Bonus or `kl`: `1d100b[tens (50),20,(70) keep lowest; ones 4] = 24`. Penalty or `kh`: `... keep highest ...`. Explicit form: `1d100t3kl[tens (50),20,(70) keep lowest; ones 4] = 24`. This text also appears in the history list.
-- [ ] **Errors:** new messages in the existing plain-English style for each case above.
-- [ ] **ADV / DIS cursor detection:** `termAt` is updated so a `d100tNkl` term is recognized as one dice term at the cursor.
-- [ ] **No display change:** dropped tens dice are dimmed as they already are for bonus and penalty.
-- [ ] **Files:** `script.js` only. Cache-bust: script.js?v=3→4.
+**Verification:** Playwright with forced dice values, 40 checks, all pass, zero JS errors, 13 seconds. `d100t2kl` equals `d100b` and `d100t2kh` equals `d100p` for the same dice; three tens dice with 50, 20, 70 and ones 4 give 24 (`kl`) and 74 (`kh`); `00`+`0` case (30 for `kl`, 100 for `kh`); `dh2`, `dl2`, `d1` and `k` forms; `d%`; every new error; plain-words text in the roll text and in history; plain `d100` text unchanged; ADV/DIS on a `d100t3kl` term, alone and inside a sum; 150 random `d100t3kl` rolls where the kept die was always the lowest result and matched the total.
 
-Verification plan (targeted, about 1 minute), forced dice values for exact results: `d100t2kl` and `d100b` give the same result for the same dice, `d100t2kh` and `d100p` likewise; `d100t3kl` with tens 50, 20, 70 and ones 4 gives 24 and `d100t3kh` gives 74; the `00` with `0` case (tens 00 and 30, ones 0: kl gives 30, kh gives 100); `dh2` / `dl2` forms with `t3`; every error (single d100 only, `t` with `b`, no keep/drop, keeping more than one, N out of range); the new "keep lowest" and "keep highest" wording in the roll text and the history; ADV/DIS on a `d100t3kl` term gives `(d100t3kl, d100t3kl)kh1`; the existing `b` / `p` results unchanged; zero JS errors.
+## Build Queue
 
 ### Expression Builder (on-screen keypad for the dice notation box)
 
-**Not yet authorized to build.** The notation it builds is in place (Build Log 4); it ships after the tens-dice item above so the keys match.
+**Not yet authorized to build.** The notation it builds is in place (Build Logs 4 and 5).
 
 Replaces the current die-button grid in the dice tray with a keypad that builds the expression in the notation box without the phone keyboard. Calculator-style: every key inserts exactly what it says.
 
@@ -129,7 +123,7 @@ Replaces the current die-button grid in the dice tray with a keypad that builds 
 - [ ] **Easy to resize later:** key height, key gap and column counts are set through CSS custom properties (for example `--key-h`, `--key-gap`) in one place, so tightening the keys is a one-line change. The user expects to shrink the keys after seeing the first build (their phone keyboard has 10 keys across); the 32 x 32 px minimum stays unless they say otherwise.
 - [ ] **Key size (hard minimum):** every key is at least 32 x 32 CSS px. Target is 38 to 40px tall; widths come from the grid (about 62px with 5 columns and about 50px with 6 columns on a 360px-wide phone). The verification check measures every key's rendered size at 360px and 412px wide and fails the build if any key is under 32 x 32.
 - [ ] **Layout:** compact keys in a grid: two dice rows (d2 to d10, then d12, d20, d30, d100 and `d`), two digit rows (1 to 5, 6 to 0), an operator row (`+ − × ÷ ( )`), a notation row (`, ! B P T MIN MAX`, 7 keys), a keep/drop row (KH KL DH DL DEL), and the quick button row. Risk: this is a tall keypad; the tray scrolls and ROLL stays sticky. Check on the phone.
-- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=4→5 (assuming the tens-dice item above ships first).
+- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=4→5.
 
 Verification plan (targeted, about 1 to 2 minutes): every key renders at least 32 x 32 px at 360px and 412px wide; key sequences produce the exact expected strings (`2`,`d6` → `2d6`; `4`,`d6`,`DL`,`1` → `4d6dl1`; `1`,`d`,`7` → `1d7`; `(`,`d8`,`,`,`d6`,`)`,`KH` → `(d8,d6)kh`; `d100`,`B` → `d100b`; `d100`,`T`,`3`,`KL` → `d100t3kl`; the quick button; operator keys insert `* / + - ( )`); insertion in the middle of a string and replacing a selection; DEL on a character and on a selection; the keyboard toggle flips `inputmode`; a keypad-built expression rolls correctly; the delayed error message (hidden right after a key press, shown after the pause); old dX prompt and grid are gone; ROLL visible at 412x700 and 360x600; zero JS errors; a screenshot. **Needs a real-device check:** that `inputmode="none"` really suppresses the keyboard on Android Chrome, cursor behavior when tapping in the box, and key tap size and feel.
 

@@ -398,25 +398,41 @@
                         if (n !== 1) throw new DiceError('#NUM!', 'Bonus and penalty dice work on a single d100', `use d100${bp}, not ${n}d100${bp}`);
                         if (bpExtra < 1 || bpExtra > 10) throw new DiceError('#NUM!', 'Use 1 to 10 bonus or penalty dice');
                     }
+                    let tensN = 0, tRaw = '';
+                    const tm = /^t(\d*)/.exec(rest());
+                    if (tm) {
+                        if (!pct) throw new DiceError('#VALUE!', 'The tens-dice form (t) only works on d100', 'like d100t3kl');
+                        if (bm) throw new DiceError('#VALUE!', 'Use either b/p or t, not both', 'like d100b or d100t2kl');
+                        if (tm[1] === '') throw new DiceError('#VALUE!', 'd100t needs the number of tens dice', 'like d100t3kl');
+                        i += tm[0].length; tensN = Number(tm[1]); tRaw = tm[0];
+                        if (n !== 1) throw new DiceError('#NUM!', 'The tens-dice form works on a single d100', `use d100t${tensN}kl, not ${n}d100t${tensN}kl`);
+                        if (tensN < 2 || tensN > 11) throw new DiceError('#NUM!', 'Use 2 to 11 tens dice');
+                    }
                     let explode = false;
                     if (src[i] === '!') {
                         if (pct) throw new DiceError('#NUM!', "Exploding dice (!) don't work on d100");
                         explode = true; i++;
                     }
                     const kd = keepDrop();
-                    if (kd && (kd.k < 1 || kd.k > n)) throw new DiceError('#NUM!', `${kd.raw} keeps or drops ${kd.k}, but the term has ${n} dice`);
+                    if (tensN) {
+                        if (!kd) throw new DiceError('#VALUE!', `d100${tRaw} needs kl or kh after it`, `like d100${tRaw}kl`);
+                        const keptCount = kd.mode[0] === 'k' ? kd.k : tensN - kd.k;
+                        if (keptCount !== 1) throw new DiceError('#NUM!', `${kd.raw} would keep ${Math.max(keptCount, 0)} of the ${tensN} tens dice; exactly one must be kept`, 'use kl or kh');
+                    } else if (kd && (kd.k < 1 || kd.k > n)) throw new DiceError('#NUM!', `${kd.raw} keeps or drops ${kd.k}, but the term has ${n} dice`);
 
                     // Roll: every unit is one value that keep/drop can keep or drop
                     const units = [];
-                    if (bp) {
+                    if (bp || tensN) {
+                        const count = bp ? bpExtra + 1 : tensN;
+                        const sel = bp ? { mode: bp === 'b' ? 'kl' : 'kh', k: 1 } : kd; // bonus keeps the lowest result, penalty the highest
                         const ones = randInt(10) - 1, tens = [];
-                        for (let t = 0; t <= bpExtra; t++) tens.push((randInt(10) - 1) * 10);
+                        for (let t = 0; t < count; t++) tens.push((randInt(10) - 1) * 10);
                         const results = tens.map(tv => (tv + ones) || 100);
-                        const target = bp === 'b' ? Math.min(...results) : Math.max(...results);
-                        const chosen = results.indexOf(target);
+                        const chosen = pickKept(results, sel.mode, sel.k).indexOf(true);
+                        const keepsLowest = sel.mode === 'kl' || sel.mode === 'dh';
                         const dice = tens.map((tv, idx) => ({ sides: 100, value: tv, kept: idx === chosen, kind: 'tens' }));
                         dice.push({ sides: 10, value: ones, kept: true, kind: 'ones' });
-                        units.push({ v: target, dice, text: `tens ${tens.map((tv, idx) => (idx === chosen ? tensText(tv) : `(${tensText(tv)})`)).join(',')}; ones ${ones}` });
+                        units.push({ v: results[chosen], dice, text: `tens ${tens.map((tv, idx) => (idx === chosen ? tensText(tv) : `(${tensText(tv)})`)).join(',')} keep ${keepsLowest ? 'lowest' : 'highest'}; ones ${ones}` });
                     } else if (pct) {
                         for (let d = 0; d < n; d++) {
                             const tv = (randInt(10) - 1) * 10, ov = randInt(10) - 1;
@@ -433,13 +449,13 @@
                             }
                         }
                     }
-                    const keep = kd ? pickKept(units.map(u => u.v), kd.mode, kd.k) : units.map(() => true);
+                    const keep = (kd && !tensN) ? pickKept(units.map(u => u.v), kd.mode, kd.k) : units.map(() => true);
                     units.forEach((u, idx) => { if (!keep[idx]) u.dice.forEach(d => { d.kept = false; }); });
                     const total = units.reduce((a, u, idx) => a + (keep[idx] ? u.v : 0), 0);
                     const inner = units.map((u, idx) => (keep[idx] ? u.text : `(${u.text})`)).join(pct ? '; ' : ',');
                     return clamps({
                         v: total,
-                        t: `${n}d${m[2]}${bpRaw}${explode ? '!' : ''}${kd ? kd.mode + kd.k : ''}[${inner}]`,
+                        t: `${n}d${m[2]}${bpRaw}${tRaw}${explode ? '!' : ''}${tensN ? kd.raw : (kd ? kd.mode + kd.k : '')}[${inner}]`,
                         dice: [].concat(...units.map(u => u.dice))
                     });
                 }
@@ -762,7 +778,7 @@
             const SUFFIX = '(?:(?:kh|kl|dh|dl)\\d*|k\\d*|d\\d+)?(?:(?:min|max)\\d+)*';
             // The smallest dice term (with its modifiers) or ( ) / { } group, with its suffix, that holds the cursor
             function termAt(str, pos) {
-                const cands = [], re = new RegExp('(\\d*)d(?:%|\\d+)(?:[bp]\\d*)?!?' + SUFFIX, 'gi');
+                const cands = [], re = new RegExp('(\\d*)d(?:%|\\d+)(?:[bp]\\d*|t\\d+)?!?' + SUFFIX, 'gi');
                 let m;
                 while ((m = re.exec(str))) {
                     if (m[0].length === 0) { re.lastIndex++; continue; }
