@@ -59,7 +59,28 @@ Reported on Android Chrome: the dice button could not be seen. Cause: the button
 
 ## Build Queue
 
-_Empty — nothing queued right now._
+### Expression Builder (on-screen keypad for the dice notation box)
+
+**Not yet authorized to build.**
+
+Replaces the current die-button grid in the dice tray with a keypad that builds the expression in the notation box without the phone keyboard. Calculator-style: every key inserts exactly what it says.
+
+- [ ] **Dice keys (top):** d2, d4, d6, d8, d10, d12, d20, d30, d100, plus a `d` key. They insert `d2`, `d4`, ... `d100`, and `d`. Tapping `2` then `d6` gives `2d6`; tapping `d6` alone gives `d6` (one die). Custom dice come from the `d` key plus digits (`1`, `d`, `7`).
+- [ ] **Digit keys:** 1 2 3 4 5 6 7 8 9 0.
+- [ ] **Operator keys:** `+`, `-`, `×`, `÷`, `(`, `)`. The multiply and divide keys show `×` and `÷` but insert `*` and `/`. Labels are written as HTML entities in the markup so they do not depend on file encoding.
+- [ ] **Keep/drop keys:** KH, KL, DH, DL. They insert `kh`, `kl`, `dh`, `dl`.
+- [ ] **DEL key:** deletes the selection, or the character before the cursor.
+- [ ] **Insertion point:** keys insert at the cursor position (replacing any selected text) and leave the cursor right after the inserted text. Tapping inside the box moves the cursor.
+- [ ] **Keyboard:** the box uses `inputmode="none"` so the phone keyboard does not pop up. A small keyboard-icon button beside the box (inline SVG) toggles the real keyboard on and off (`inputmode` `none` and `text`), so typing by hand still works.
+- [ ] **Replaces the old grid:** the old die button grid (`#dicePad`), its tap-to-add-or-increment behavior (`addDie`) and the dX prompt are removed. Custom dice now use the `d` key.
+- [ ] **Unchanged:** Clear, the modifier -/+ field, ADV/DIS (still enabled only for exactly one d20), the notation engine, limits, animation, and history.
+- [ ] **ROLL button stays reachable:** the keypad makes the tray taller than most phone screens, so ROLL becomes sticky at the bottom of the tray (always visible while the tray scrolls). *(Added by Claude as a design necessity. Change before authorizing if wanted.)*
+- [ ] **Live error message is delayed:** while building, partial expressions like `3d` are invalid, so the red error message appears only after 700 ms with no key presses. ROLL still disables immediately, and the message clears as soon as the expression is valid. *(Added by Claude. Change before authorizing if wanted.)*
+- [ ] **Layout:** compact keys (about 38 to 40px tall) in a 5-column grid: two dice rows (d2 to d10, then d12, d20, d30, d100 and `d`), two digit rows (1 to 5, 6 to 0), one operator row, one keep/drop row with DEL.
+- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=2→3.
+
+Verification plan (targeted, about 1 to 2 minutes): key sequences produce the exact expected strings (`2`,`d6` → `2d6`; `4`,`d6`,`DL`,`1` → `4d6dl1`; `1`,`d`,`7` → `1d7`; operator keys insert `* / + - ( )`); insertion in the middle of a string and replacing a selection; DEL on a character and on a selection; the keyboard toggle flips `inputmode`; a keypad-built expression rolls correctly; the delayed error message (hidden right after a key press, shown after the pause); ADV/DIS enable rule still works; old dX prompt and grid are gone; ROLL visible at 412x700 and 360x600; zero JS errors; a screenshot. **Needs a real-device check:** that `inputmode="none"` really suppresses the keyboard on Android Chrome, cursor behavior when tapping in the box, and key tap size and feel.
+
 
 ## Build Planner
 
@@ -73,6 +94,7 @@ All items below are ideas only. None are designed, queued or authorized to build
 - **Save and restore:** a reload wipes tokens, calibration and the selected map; only the folder names are remembered. Open questions: autosave to localStorage, export/import as a file, or both? Map and token images are blob URLs and can't be saved directly.
 - **Feet-per-square stored as a string:** `grid.ftPerSq = this.value` stores text, not a number. Distance math currently works by coercion. Log only; fix if/when authorized.
 - **Undo:** no way to undo a token move, delete or HP change.
+- **CLAUDE.md cache-busting note is out of date:** it still says "Currently N/A: the app is a single self-contained `index.html`." Since Build Log 1 the app is split into `index.html`, `styles.css` and `script.js`, so cache-busting applies and is being followed. Log only; update the note if/when authorized.
 
 ### Table features other VTTs do well
 
