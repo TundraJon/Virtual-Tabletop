@@ -30,12 +30,12 @@ An animated dice roller that slides up from the bottom of the map screen. Offlin
 - [ ] **Advantage / disadvantage:** ADV and DIS toggles, enabled only when the pool is exactly one d20. Rolls two d20, keeps the higher (ADV) or lower (DIS), and shows the discarded die dimmed. *(Scope detail chosen by Claude. Change before authorizing if wanted.)*
 - [ ] **Rolling:** a ROLL button. Each result is chosen first with `crypto.getRandomValues` (rejection sampling, so no modulo bias), then the animation lands on it, so the animation cannot skew a roll.
 - [ ] **Visuals:** dice drawn on canvas as polyhedron silhouettes (d2 as a coin, d4 triangle, d6 square, d8 diamond, d10/d100 kite-style, d12 pentagon, d20 triangle-in-hexagon, d30 and custom as a hexagon). They tumble and spin for about 1.2 seconds, then settle on the number. Total shown large. Natural 20 on a d20 gets a gold glow and particle burst; natural 1 gets a red flash. Animation is skipped (instant result) when the device prefers reduced motion.
-- [ ] **Vibration:** `navigator.vibrate` short pulse on landing, longer pulse on natural 20/1. Silent no-op where unsupported (e.g. iOS Safari). No sound.
+- [ ] **No sound, no vibration.**
 - [ ] **History:** last 10 rolls (pool, modifier, individual dice, total, time) listed in the tray. Saved to `localStorage` so it survives a reload. A Clear History button.
 - [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust bumped for each file changed, logged before and after.
 - [ ] No changes to existing map, token or calibration behavior.
 
-Verification plan: Playwright for zero JS errors; open and close the tray; pool add, remove, clear and the 10-dice cap; modifier limits; ADV/DIS enable rules and keep-higher/lower math; custom dX bounds; RNG distribution check over thousands of rolls per die (all faces reachable, roughly uniform); history capped at 10 and persisted across reload; mocked `navigator.vibrate` called; screenshots of each die and the 20/1 effects; re-run the Build Log 1 checks as a regression. **Needs a real-device check:** actual vibration, touch feel and animation smoothness on a phone.
+Verification plan: Playwright for zero JS errors; open and close the tray; pool add, remove, clear and the 10-dice cap; modifier limits; ADV/DIS enable rules and keep-higher/lower math; custom dX bounds; RNG distribution check over thousands of rolls per die (all faces reachable, roughly uniform); history capped at 10 and persisted across reload; screenshots of each die and the 20/1 effects; re-run the Build Log 1 checks as a regression. **Needs a real-device check:** touch feel and animation smoothness on a phone.
 
 ## Build Planner
 
