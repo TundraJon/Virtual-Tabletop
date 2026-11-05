@@ -57,36 +57,36 @@ Reported on Android Chrome: the dice button could not be seen. Cause: the button
 - **Known limitation, not changed:** below about 700px of visible height (for example 360x600) the tray's content is taller than the tray, so ROLL is reached by scrolling inside the tray. At 412x700 and taller, ROLL is visible without scrolling.
 - **Needs a real-device check:** the simulation reproduces the symptom, but the real Chrome toolbar behavior should be confirmed on the phone.
 
+## Build Log 4 (completed)
+### Advanced dice notation, percentile dice, and advantage on any die
+
+Built Build Queue item A (the notation engine and ADV/DIS upgrade) in `script.js`. The keypad (Expression Builder) is a separate item and is still queued.
+
+- [x] Groups: `(a, b)kh1` and `{a, b}kh1` (parentheses and braces interchangeable) with comma-separated items; `kh`, `kl`, `dh`, `dl` with an optional count (default 1). Dice in a dropped item are flagged dropped. Errors with hints for a comma outside a group, a group with commas and no suffix, and a keep/drop suffix on a group with no commas (for example `(1d8+1d6)kh`).
+- [x] Shorthand: `k` / `kN` (keep highest) and `dN` (drop lowest N).
+- [x] Exploding dice `!`, up to 20 extra dice per term (extras do not count toward the 50-dice limit); keep/drop applies across all of a term's dice. Error on d100.
+- [x] `minN` / `maxN` clamps on dice terms and groups, chainable (`(d8,d6)kh1min7`).
+- [x] Percentile: `d100` and `d%` roll a tens die (00 to 90) and a ones die (0 to 9); `00`+`0` is 100. `d100b` / `d100bN` (bonus) and `d100p` / `d100pN` (penalty): one ones die, extra tens dice, keep the lowest (bonus) or highest (penalty) result. Single d100 only, 1 to 10 extra dice. `2d100kh1` is true advantage.
+- [x] Engine returns each die with `sides`, `value`, `kept`, and for percentile `kind` (`tens` or `ones`) and for explosions `extra`. New `rollDice(expr, dry)`; validation (live error line, button states) now uses a dry run that rolls every die as 1 and uses no randomness.
+- [x] Display: each d100 draws two dice (tens in the d100 color with labels `00` to `90`, ones in the d10 color); dropped dice, including dice in dropped group items and dropped bonus/penalty tens dice, are dimmed; new `dieLabel` and updated rolling flicker for tens/ones dice.
+- [x] ADV / DIS now work on any die or term: they convert the dice term at the cursor (`d6` → `2d6kh1`, `2d6` → `(2d6, 2d6)kh1`, a whole group becomes `(group, group)kh1`); a lone die in the box (any size, including d100) rolls the advantage version immediately and leaves the box unchanged. Disabled when the cursor is not on a dice term. New helpers `termAt`, `advText`, `advDis`; the buttons re-check on cursor movement.
+- [x] `niceError` now shows the engine's message and hint for new errors.
+- [x] Cache-bust bumped: script.js?v=2→3 (styles.css unchanged at v=3).
+
+**Verification:** Playwright (Chromium, 412x800) with forced dice values for exact results, 69 checks, all pass, zero JS errors, about 55 seconds.
+- Groups (keep/drop with commas and braces, default count, `(1d8,1d6,1d4)dh1`, `2d20kh1 + (d8, d6)kh1 + 2` = 17), shorthand, and every new error message.
+- Percentile: `20`+`4` = 24, `00`+`5` = 5, `00`+`0` = 100, `d%`, bonus (tens 50 and 20, ones 4 gives 24), penalty (gives 54), bonus with ones 0 and tens `00` and 30 gives 30, two bonus dice, `2d100kh1`, the errors. Over thousands of real rolls, `d100` covers all 100 values with chi-square inside the limit, and bonus and penalty averages land where expected (about 40 and 61).
+- Exploding (8 then 3 = 11, no explosion = 4, the 20-extra cap = 168, inside a group), clamps (floor, ceiling, braces, chained, error on a number).
+- ADV/DIS on terms at the cursor (`d6+2d4`, after the `+`, `2d6`, a group, `4d6kh3`), disabled cases, a lone d6 / d100 / d20 rolling immediately.
+- Earlier behavior re-checked where touched: 60 rolls of `4d6dl1`, `2d20kh1`, `2d20kl1`, limits, `3d`, `/0`, `1d1`, the `×` sign. Screenshots reviewed for the percentile pair, a dropped group item, an explosion and a bonus roll with dropped tens dice.
+- **Not verified here:** ADV/DIS follow the cursor through `selectionchange`; tapping inside the box on Android Chrome should be checked on the phone.
+- **Known, not changed:** the old die buttons (replaced by the keypad later) increment the first matching term, so tapping d100 while the box holds `d100b` makes `2d100b`, which shows the single-d100 error.
+
 ## Build Queue
 
-Build the two items below in this order (A, then B), so the keypad gets the final key set.
+### Expression Builder (on-screen keypad for the dice notation box)
 
-### A. Advanced dice notation, percentile dice, and advantage on any die
-
-**Not yet authorized to build.**
-
-Upgrades the notation engine in `script.js` and the dice display. No keypad work (that is item B). The existing notation (`NdS`, `d%`, `kh kl dh dl`, `+ - * /`, parentheses, limits) keeps working unchanged.
-
-- [ ] **Groups with a comma:** `(a, b)kh1` or `{a, b}kh1` (parentheses and braces are interchangeable). Items are separated by top-level commas; each item is any expression and counts as one value (its total). A suffix `kh`, `kl`, `dh` or `dl` with an optional number (default 1, at most the number of items) keeps or drops items, and the group's value is the sum of the kept items. Examples: `(1d8, 1d6)kh` keeps the higher of the two; `2d20kh1 + (d8, d6)kh1 + 2`. Plain parentheses with no commas and no suffix stay ordinary math. A comma outside a group with a keep/drop suffix, or a keep/drop suffix on a group with no commas (for example `(1d8+1d6)kh`), is an error with a plain-English hint such as "use (1d8,1d6)kh1".
-- [ ] **Shorthand:** `k` alone means `kh1`; `kN` means `khN`; `dN` (digits required) after a dice term or group means drop lowest N (`dlN`). `d` followed by nothing is not valid as a modifier.
-- [ ] **Exploding dice `!`:** `1d8!` rolls again on a maximum and adds; the extra dice are rolled in a chain. At most 20 extra dice per term (extras do not count toward the 50-dice limit). The term's value includes all extra dice. Keep/drop on the same term applies after explosions, across all its dice (`4d6!kh3`). Not allowed on d100 / `d%` (error). Works inside group items, so Savage Worlds is `(1d8!, 1d6!)kh`.
-- [ ] **min / max:** a suffix `minN` or `maxN` on a dice term or a group clamps its result: `min5` sets a floor of 5, `max8` a ceiling of 8 (`{1d10+3}min5`: a result under 5 counts as 5). A group with min/max and no commas is ordinary math inside, then clamped. Suffixes chain left to right (`(d8, d6)kh1min2`).
-- [ ] **Percentile dice:** `d100` and `d%` always roll two dice, a tens die (00, 10, ... 90) and a ones die (0 to 9). The result is tens plus ones, and `00` with `0` counts as 100. Each d100 counts as 1 die toward the 20-per-term and 50-per-roll limits. Percentile dice work inside groups and with kh/kl/dh/dl (`2d100kh1` is true advantage: two full rolls).
-- [ ] **Bonus and penalty dice (Call of Cthulhu 7e):** `d100b` adds one bonus die, `d100b2` adds two; `d100p` and `d100p2` add penalty dice. The ones die is rolled once, each extra tens die is rolled separately, and each tens die is paired with the ones die (`00`+`0` = 100). Bonus keeps the lowest result, penalty keeps the highest. Example: tens 50 and 20, ones 4 gives 24 (the 50 is dropped). Only on a single d100 (`2d100b` is an error).
-- [ ] **Result text:** group: `(1d8[3], 1d6[5])kh1[(3),5] = 5` (dropped item totals in parentheses); percentile: `1d100[tens 20, ones 4] = 24`; bonus: `1d100b[tens (50),20; ones 4] = 24`; exploding: `1d8![8,3] = 11`; clamp: `(1d10[2] + 3)min5 = 5`.
-- [ ] **Per-die results for the animation:** the engine returns every die with its sides, value, and kept/dropped flag. Dice inside a dropped group item, and dropped bonus/penalty tens dice, are flagged dropped. Percentile dice carry their role (tens or ones). Exploded extras are flagged as extras.
-- [ ] **Percentile display:** each d100 shows two dice. The tens die uses the d100 color, a kite shape, and labels `00` to `90`; the ones die uses the d10 color and labels `0` to `9`. Dropped dice are dimmed as today. The 12-dice animation limit counts individual dice (a d100 is 2).
-- [ ] **ADV / DIS on any die or term:** the buttons convert the dice term at the cursor (the term the cursor is in or right after, including its modifiers; a whole `( ... )` group counts as one term). A single die `1dN` or `dN` becomes `2dNkh1` (ADV) or `2dNkl1` (DIS), including d100. Any other term `T` becomes `(T, T)kh1` or `(T, T)kl1`, for example `2d6` becomes `(2d6, 2d6)kh1`. So `d6 advantage + 2d4` is `2d6kh1+2d4`. They are disabled when there is no dice term at the cursor.
-- [ ] **One-tap shortcut kept:** when the box holds exactly one die (`d6`, `1d20`, `d100`, any size), ADV or DIS rolls the advantage version immediately and leaves the box unchanged, as it does now for a lone d20. Otherwise ADV/DIS edit the box and do not roll.
-- [ ] **Limits and errors:** existing limits unchanged (20 dice per term, 50 per roll, 2 to 1000 sides). New error messages in the same plain-English style, shown live in the existing error line.
-- [ ] **Files:** `script.js` only (engine, ADV/DIS logic, dice drawing); `index.html` and `styles.css` unchanged unless a label tweak is needed. Cache-bust: script.js?v=2→3.
-- [ ] Out of scope here: rerolls (`r`, `ro`), target-count pools (`>X`, `<X`, `fX`), success/failure checks, game presets, and all keypad work (see Planner and item B).
-
-Verification plan (targeted, about 2 minutes), using the forced-random test harness for exact values: group keep-higher/lower/drop with commas and braces, default count, the two error cases, shorthand `k` / `kN` / `dN`; percentile pair math (tens 50 and 20 with ones 4 and bonus gives 24; penalty gives 54; `00`+`0` is 100; bonus with ones 0 and tens 00 and 30 gives 30); `d100` range and distribution over a few thousand rolls; exploding (forced 8 then 3 on a d8 gives 11; the 20-extra cap; error on d100); min/max clamps and chaining; ADV/DIS conversions at the cursor (`d6+2d4` cursor on d6 gives `2d6kh1+2d4`; `2d6` gives `(2d6,2d6)kh1`; single-die box rolls immediately; disabled with no term); existing `4d6dl1`, `2d20kh1`, `2d20kl1`, limits still correct; screenshots of the percentile pair, a dropped group item, and an exploded roll; zero JS errors.
-
-### B. Expression Builder (on-screen keypad for the dice notation box)
-
-**Not yet authorized to build.** Build after item A so the keys match the final notation.
+**Not yet authorized to build.** The notation it builds is already in place (Build Log 4).
 
 Replaces the current die-button grid in the dice tray with a keypad that builds the expression in the notation box without the phone keyboard. Calculator-style: every key inserts exactly what it says.
 
@@ -100,12 +100,15 @@ Replaces the current die-button grid in the dice tray with a keypad that builds 
 - [ ] **Insertion point:** keys insert at the cursor (replacing any selected text) and leave the cursor right after the inserted text. Tapping inside the box moves the cursor.
 - [ ] **Keyboard:** the box uses `inputmode="none"` so the phone keyboard does not pop up. A small keyboard-icon button beside the box (inline SVG) toggles the real keyboard on and off (`inputmode` `none` and `text`).
 - [ ] **Replaces the old grid:** the old die button grid (`#dicePad`), its tap-to-add-or-increment behavior (`addDie`) and the dX prompt are removed. Custom dice use the `d` key.
-- [ ] **Unchanged:** Clear, the modifier -/+ field, ADV/DIS (behavior as defined in item A), the notation engine, limits, animation, and history.
+- [ ] **Unchanged:** Clear, the modifier -/+ field, ADV/DIS (behavior as in Build Log 4), the notation engine, limits, animation, and history.
 - [ ] **ROLL button stays reachable:** the keypad makes the tray taller than most phone screens, so ROLL becomes sticky at the bottom of the tray. *(Added by Claude as a design necessity. Change before authorizing if wanted.)*
 - [ ] **Live error message is delayed:** partial expressions like `3d` are invalid while building, so the red error message appears only after 700 ms with no key presses. ROLL still disables immediately, and the message clears as soon as the expression is valid. *(Added by Claude. Change before authorizing if wanted.)*
+- [ ] **Expression box stays pinned:** the notation box, its error/preview line and the keyboard-toggle button are pinned (sticky) at the top of the tray under the header, so what you are building stays visible while the keys scroll underneath. Costs about 70px of screen. (Decided with the user.)
+- [ ] **Stage shrinks:** the dice stage height drops from 230px to about 150px while the keypad is shown, to give the keys more room. (Decided with the user. Exact height to be tuned on the phone.)
+- [ ] **Easy to resize later:** key height, key gap and column counts are set through CSS custom properties (for example `--key-h`, `--key-gap`) in one place, so tightening the keys is a one-line change. The user expects to shrink the keys after seeing the first build (their phone keyboard has 10 keys across); the 32 x 32 px minimum stays unless they say otherwise.
 - [ ] **Key size (hard minimum):** every key is at least 32 x 32 CSS px. Target is 38 to 40px tall; widths come from the grid (about 62px with 5 columns and about 50px with 6 columns on a 360px-wide phone). The verification check measures every key's rendered size at 360px and 412px wide and fails the build if any key is under 32 x 32.
 - [ ] **Layout:** compact keys in a grid: two dice rows (d2 to d10, then d12, d20, d30, d100 and `d`), two digit rows (1 to 5, 6 to 0), an operator row (`+ − × ÷ ( )`), a notation row (`, ! B P MIN MAX`), a keep/drop row (KH KL DH DL DEL), and the quick button row. Risk: this is a tall keypad; the tray scrolls and ROLL stays sticky. Check on the phone.
-- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=3→4 (assuming item A ships first).
+- [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust: styles.css?v=3→4, script.js?v=3→4.
 
 Verification plan (targeted, about 1 to 2 minutes): every key renders at least 32 x 32 px at 360px and 412px wide; key sequences produce the exact expected strings (`2`,`d6` → `2d6`; `4`,`d6`,`DL`,`1` → `4d6dl1`; `1`,`d`,`7` → `1d7`; `(`,`d8`,`,`,`d6`,`)`,`KH` → `(d8,d6)kh`; `d100`,`B` → `d100b`; the quick button; operator keys insert `* / + - ( )`); insertion in the middle of a string and replacing a selection; DEL on a character and on a selection; the keyboard toggle flips `inputmode`; a keypad-built expression rolls correctly; the delayed error message (hidden right after a key press, shown after the pause); old dX prompt and grid are gone; ROLL visible at 412x700 and 360x600; zero JS errors; a screenshot. **Needs a real-device check:** that `inputmode="none"` really suppresses the keyboard on Android Chrome, cursor behavior when tapping in the box, and key tap size and feel.
 

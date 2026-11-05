@@ -279,7 +279,7 @@
 
         // ===== DICE ROLLER =====
         (function () {
-            const MAX_PER_TERM = 20, MAX_TOTAL = 50, MAX_SIDES = 1000, ANIM_MAX = 12, HIST_MAX = 10, HIST_KEY = 'vttDiceHistory';
+            const MAX_PER_TERM = 20, MAX_TOTAL = 50, MAX_SIDES = 1000, MAX_EXTRA = 20, ANIM_MAX = 12, HIST_MAX = 10, HIST_KEY = 'vttDiceHistory';
             const COLORS = { 2: '#d9b13b', 4: '#35c27a', 6: '#e0554b', 8: '#4b8fe3', 10: '#a853e0', 12: '#e58a3f', 20: '#00d9b0', 30: '#e04ba5', 100: '#bfd140' };
             const PAD = [2, 4, 6, 8, 10, 12, 20, 30, 100, 'X'];
             const el = (id) => document.getElementById(id);
@@ -295,67 +295,165 @@
                 constructor(code, why, fix) { super(why || code); this.name = 'DiceError'; this.code = code; this.why = why || ''; this.fix = fix || ''; }
             }
 
+            let dryRun = false; // validation passes roll every die as 1 and use no randomness
             function randInt(sides) {
+                if (dryRun) return 1;
                 const buf = new Uint32Array(1), limit = Math.floor(4294967296 / sides) * sides;
                 do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
                 return 1 + (buf[0] % sides);
             }
 
-            // Returns { total, text, dice }. dice = [{ sides, value, kept }] in roll order.
-            function rollDice(expr) {
-                if (/\d\s+\d/.test(String(expr))) throw new DiceError('#VALUE!');
+            // Which of `values` are kept. mode: kh, kl, dh or dl; k: how many. Ties keep the later one when keeping highest.
+            function pickKept(values, mode, k) {
+                const n = values.length;
+                const order = values.map((v, idx) => idx).sort((a, b) => values[a] - values[b] || a - b); // lowest first
+                const high = mode === 'kh' || mode === 'dl'; // keep the highest (kh), or drop the lowest (dl)
+                const chosen = mode[0] === 'k' ? k : n - k;  // how many are kept
+                const kept = high ? order.slice(n - chosen) : order.slice(0, chosen);
+                const keep = values.map(() => false);
+                kept.forEach(idx => { keep[idx] = true; });
+                return keep;
+            }
+
+            const tensText = (v) => (v === 0 ? '00' : String(v));
+
+            // Returns { total, text, dice }. dice = [{ sides, value, kept, kind?, extra? }] in roll order.
+            // kind is 'tens' or 'ones' for percentile dice; extra marks dice added by an explosion.
+            function rollDice(expr, dry) {
+                dryRun = !!dry;
+                try { return parseRoll(expr); } finally { dryRun = false; }
+            }
+
+            function parseRoll(expr) {
+                if (/\d\s+\d/.test(String(expr))) throw new DiceError('#VALUE!'); // "3d6 4" is not "3d64"
                 const src = String(expr).toLowerCase().replace(/\s+/g, '');
                 if (!src) throw new DiceError('#VALUE!');
                 let i = 0, diceCount = 0;
-                const allDice = [];
                 const rest = () => src.slice(i);
 
-                function primary() {
-                    if (src[i] === '(') {
-                        i++;
-                        const e = sum();
-                        if (src[i] !== ')') throw new DiceError('#VALUE!');
-                        i++;
-                        return { v: e.v, t: `(${e.t})` };
-                    }
-                    let m = /^(\d*)d(%|\d+)/.exec(rest());
-                    if (m) {
+                // kh / kl / dh / dl with an optional number, plus the shorthands k (keep highest) and dN (drop lowest N)
+                function keepDrop() {
+                    let m = /^(kh|kl|dh|dl)(\d*)/.exec(rest()), mode;
+                    if (m) { mode = m[1]; }
+                    else if ((m = /^k(\d*)/.exec(rest()))) { mode = 'kh'; }
+                    else if ((m = /^d(\d+)/.exec(rest()))) { mode = 'dl'; }
+                    else return null;
+                    const digits = m[m.length - 1];
+                    i += m[0].length;
+                    return { mode, k: digits === '' ? 1 : Number(digits), raw: m[0] };
+                }
+
+                // minN / maxN: a floor or ceiling on a dice term or group
+                function clamps(node) {
+                    let m;
+                    while ((m = /^(min|max)(\d+)/.exec(rest()))) {
                         i += m[0].length;
-                        const n = m[1] === '' ? 1 : Number(m[1]), sides = m[2] === '%' ? 100 : Number(m[2]);
-                        if (n < 1) throw new DiceError('#NUM!', 'A dice term needs at least 1 die');
-                        if (n > MAX_PER_TERM) throw new DiceError('#NUM!', `${n} dice in one term; the limit is ${MAX_PER_TERM}`, `split it into terms of ${MAX_PER_TERM} or fewer, like ${MAX_PER_TERM}d${m[2]}+${Math.min(n - MAX_PER_TERM, MAX_PER_TERM)}d${m[2]}`);
-                        if (sides < 2 || sides > MAX_SIDES) throw new DiceError('#NUM!', `A die needs 2 to ${MAX_SIDES} sides, not ${sides}`);
-                        diceCount += n;
-                        if (diceCount > MAX_TOTAL) throw new DiceError('#NUM!', `${diceCount} dice in all; the limit is ${MAX_TOTAL} in one roll`);
-                        let keepMode = '', k = 0;
-                        const km = /^(kh|kl|dh|dl)(\d*)/.exec(rest());
-                        if (km) {
-                            i += km[0].length;
-                            keepMode = km[1];
-                            k = km[2] === '' ? 1 : Number(km[2]);
-                            if (k < 1 || k > n) throw new DiceError('#NUM!', `${km[0]} keeps or drops ${k}, but the term has ${n} dice`);
-                        }
-                        const dice = [];
-                        for (let d = 0; d < n; d++) dice.push(randInt(sides));
-                        const keep = dice.map(() => true);
-                        if (keepMode) {
-                            const order = dice.map((v, idx) => idx).sort((a, b) => dice[a] - dice[b] || a - b); // lowest first
-                            const high = keepMode === 'kh' || keepMode === 'dl'; // keep the highest (kh), or drop the lowest (dl)
-                            const chosen = keepMode[0] === 'k' ? k : n - k;      // how many are kept
-                            const kept = high ? order.slice(n - chosen) : order.slice(0, chosen);
-                            keep.fill(false);
-                            kept.forEach(idx => { keep[idx] = true; });
-                        }
-                        dice.forEach((v, idx) => allDice.push({ sides: sides, value: v, kept: keep[idx] }));
-                        const total = dice.reduce((a, v, idx) => a + (keep[idx] ? v : 0), 0);
-                        return { v: total, t: `${n}d${m[2]}${keepMode ? keepMode + k : ''}[${dice.map((v, idx) => (keep[idx] ? v : `(${v})`)).join(',')}]` };
+                        const lim = Number(m[2]);
+                        node.v = m[1] === 'min' ? Math.max(node.v, lim) : Math.min(node.v, lim);
+                        node.t += m[1] + lim;
                     }
-                    m = /^\d+(\.\d+)?/.exec(rest());
-                    if (m) { i += m[0].length; return { v: Number(m[0]), t: m[0] }; }
+                    return node;
+                }
+
+                function group() {
+                    const close = src[i] === '(' ? ')' : '}';
+                    i++;
+                    const items = [sum()];
+                    while (src[i] === ',') { i++; items.push(sum()); }
+                    if (src[i] !== close) throw new DiceError('#VALUE!');
+                    i++;
+                    const kd = keepDrop();
+                    let node;
+                    if (kd) {
+                        if (items.length < 2) throw new DiceError('#VALUE!', `${kd.raw} compares items separated by commas`, 'use a group like (1d8,1d6)kh1');
+                        if (kd.k < 1 || kd.k > items.length) throw new DiceError('#NUM!', `${kd.raw} keeps or drops ${kd.k}, but the group has ${items.length} items`);
+                        const keep = pickKept(items.map(x => x.v), kd.mode, kd.k);
+                        items.forEach((x, idx) => { if (!keep[idx]) x.dice.forEach(d => { d.kept = false; }); });
+                        node = {
+                            v: items.reduce((a, x, idx) => a + (keep[idx] ? x.v : 0), 0),
+                            t: `(${items.map(x => x.t).join(', ')})${kd.mode}${kd.k}[${items.map((x, idx) => (keep[idx] ? x.v : `(${x.v})`)).join(',')}]`,
+                            dice: [].concat(...items.map(x => x.dice))
+                        };
+                    } else {
+                        if (items.length > 1) throw new DiceError('#VALUE!', 'A group of items separated by commas needs kh, kl, dh or dl after it', 'like (1d8,1d6)kh1');
+                        node = { v: items[0].v, t: `(${items[0].t})`, dice: items[0].dice };
+                    }
+                    return clamps(node);
+                }
+
+                function diceTerm(m) {
+                    i += m[0].length;
+                    const n = m[1] === '' ? 1 : Number(m[1]), sides = m[2] === '%' ? 100 : Number(m[2]);
+                    if (n < 1) throw new DiceError('#NUM!', 'A dice term needs at least 1 die');
+                    if (n > MAX_PER_TERM) throw new DiceError('#NUM!', `${n} dice in one term; the limit is ${MAX_PER_TERM}`, `split it into terms of ${MAX_PER_TERM} or fewer, like ${MAX_PER_TERM}d${m[2]}+${Math.min(n - MAX_PER_TERM, MAX_PER_TERM)}d${m[2]}`);
+                    if (sides < 2 || sides > MAX_SIDES) throw new DiceError('#NUM!', `A die needs 2 to ${MAX_SIDES} sides, not ${sides}`);
+                    diceCount += n;
+                    if (diceCount > MAX_TOTAL) throw new DiceError('#NUM!', `${diceCount} dice in all; the limit is ${MAX_TOTAL} in one roll`);
+                    const pct = sides === 100; // d100 and d% roll a tens die and a ones die
+                    let bp = '', bpExtra = 0, bpRaw = '';
+                    const bm = /^([bp])(\d*)/.exec(rest());
+                    if (bm) {
+                        if (!pct) throw new DiceError('#VALUE!', 'Bonus and penalty dice (b, p) only work on d100', 'like d100b');
+                        i += bm[0].length; bp = bm[1]; bpRaw = bm[0]; bpExtra = bm[2] === '' ? 1 : Number(bm[2]);
+                        if (n !== 1) throw new DiceError('#NUM!', 'Bonus and penalty dice work on a single d100', `use d100${bp}, not ${n}d100${bp}`);
+                        if (bpExtra < 1 || bpExtra > 10) throw new DiceError('#NUM!', 'Use 1 to 10 bonus or penalty dice');
+                    }
+                    let explode = false;
+                    if (src[i] === '!') {
+                        if (pct) throw new DiceError('#NUM!', "Exploding dice (!) don't work on d100");
+                        explode = true; i++;
+                    }
+                    const kd = keepDrop();
+                    if (kd && (kd.k < 1 || kd.k > n)) throw new DiceError('#NUM!', `${kd.raw} keeps or drops ${kd.k}, but the term has ${n} dice`);
+
+                    // Roll: every unit is one value that keep/drop can keep or drop
+                    const units = [];
+                    if (bp) {
+                        const ones = randInt(10) - 1, tens = [];
+                        for (let t = 0; t <= bpExtra; t++) tens.push((randInt(10) - 1) * 10);
+                        const results = tens.map(tv => (tv + ones) || 100);
+                        const target = bp === 'b' ? Math.min(...results) : Math.max(...results);
+                        const chosen = results.indexOf(target);
+                        const dice = tens.map((tv, idx) => ({ sides: 100, value: tv, kept: idx === chosen, kind: 'tens' }));
+                        dice.push({ sides: 10, value: ones, kept: true, kind: 'ones' });
+                        units.push({ v: target, dice, text: `tens ${tens.map((tv, idx) => (idx === chosen ? tensText(tv) : `(${tensText(tv)})`)).join(',')}; ones ${ones}` });
+                    } else if (pct) {
+                        for (let d = 0; d < n; d++) {
+                            const tv = (randInt(10) - 1) * 10, ov = randInt(10) - 1;
+                            units.push({ v: (tv + ov) || 100, dice: [{ sides: 100, value: tv, kept: true, kind: 'tens' }, { sides: 10, value: ov, kept: true, kind: 'ones' }], text: `tens ${tensText(tv)}, ones ${ov}` });
+                        }
+                    } else {
+                        let extras = 0;
+                        for (let d = 0; d < n; d++) {
+                            let v = randInt(sides);
+                            units.push({ v, dice: [{ sides, value: v, kept: true }], text: String(v) });
+                            while (explode && v === sides && extras < MAX_EXTRA) {
+                                extras++; v = randInt(sides);
+                                units.push({ v, dice: [{ sides, value: v, kept: true, extra: true }], text: String(v) });
+                            }
+                        }
+                    }
+                    const keep = kd ? pickKept(units.map(u => u.v), kd.mode, kd.k) : units.map(() => true);
+                    units.forEach((u, idx) => { if (!keep[idx]) u.dice.forEach(d => { d.kept = false; }); });
+                    const total = units.reduce((a, u, idx) => a + (keep[idx] ? u.v : 0), 0);
+                    const inner = units.map((u, idx) => (keep[idx] ? u.text : `(${u.text})`)).join(pct ? '; ' : ',');
+                    return clamps({
+                        v: total,
+                        t: `${n}d${m[2]}${bpRaw}${explode ? '!' : ''}${kd ? kd.mode + kd.k : ''}[${inner}]`,
+                        dice: [].concat(...units.map(u => u.dice))
+                    });
+                }
+
+                function primary() {
+                    if (src[i] === '(' || src[i] === '{') return group();
+                    const m = /^(\d*)d(%|\d+)/.exec(rest());
+                    if (m) return diceTerm(m);
+                    const num = /^\d+(\.\d+)?/.exec(rest());
+                    if (num) { i += num[0].length; return { v: Number(num[0]), t: num[0], dice: [] }; }
                     throw new DiceError('#VALUE!');
                 }
                 function unary() {
-                    if (src[i] === '-') { i++; const e = unary(); return { v: -e.v, t: `-${e.t}` }; }
+                    if (src[i] === '-') { i++; const e = unary(); return { v: -e.v, t: `-${e.t}`, dice: e.dice }; }
                     if (src[i] === '+') { i++; return unary(); }
                     return primary();
                 }
@@ -364,7 +462,7 @@
                     while (src[i] === '*' || src[i] === '/') {
                         const op = src[i++], right = unary();
                         if (op === '/' && right.v === 0) throw new DiceError('#DIV/0!');
-                        left = { v: op === '*' ? left.v * right.v : left.v / right.v, t: `${left.t} ${op === '*' ? '\u00d7' : '\u00f7'} ${right.t}` };
+                        left = { v: op === '*' ? left.v * right.v : left.v / right.v, t: `${left.t} ${op === '*' ? '\u00d7' : '\u00f7'} ${right.t}`, dice: left.dice.concat(right.dice) };
                     }
                     return left;
                 }
@@ -372,20 +470,23 @@
                     let left = product();
                     while (src[i] === '+' || src[i] === '-') {
                         const op = src[i++], right = product();
-                        left = { v: op === '+' ? left.v + right.v : left.v - right.v, t: `${left.t} ${op} ${right.t}` };
+                        left = { v: op === '+' ? left.v + right.v : left.v - right.v, t: `${left.t} ${op} ${right.t}`, dice: left.dice.concat(right.dice) };
                     }
                     return left;
                 }
                 const res = sum();
-                if (i < src.length) throw new DiceError('#VALUE!');
+                if (i < src.length) {
+                    if (src[i] === ',') throw new DiceError('#VALUE!', 'A comma only works inside a group ending in kh, kl, dh or dl', 'like (1d8,1d6)kh1');
+                    throw new DiceError('#VALUE!');
+                }
                 const total = Number(res.v.toPrecision(15));
-                return { total, text: `${res.t} = ${total}`, dice: allDice };
+                return { total, text: `${res.t} = ${total}`, dice: res.dice };
             }
 
             function niceError(e) {
                 if (!(e instanceof DiceError)) return 'Something went wrong with that roll.';
                 if (e.code === '#DIV/0!') return "Can't divide by zero.";
-                if (e.code === '#NUM!') return e.why + (e.fix ? ' - ' + e.fix : '') + '.';
+                if (e.why) return e.why + (e.fix ? ' - ' + e.fix : '') + '.';
                 return "Can't read that. Try something like 3d6+2 or 4d6dl1.";
             }
 
@@ -396,6 +497,7 @@
                 return `rgb(${f(r)},${f(g)},${f(b)})`;
             }
             const colorFor = (sides) => COLORS[sides] || '#8da2b5';
+            const dieLabel = (d) => (d.kind === 'tens' ? tensText(d.value) : String(d.value));
 
             function shapePath(c, sides, r) {
                 const poly = (pts) => { c.beginPath(); pts.forEach((p, idx) => idx ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); };
@@ -484,7 +586,7 @@
             function buildScene(res) {
                 const { w, h } = sizeCanvas();
                 const items = res.dice.slice(0, ANIM_MAX).map((d, idx) => ({
-                    sides: d.sides, value: d.value, kept: d.kept, idx,
+                    sides: d.sides, value: d.value, kept: d.kept, kind: d.kind, idx,
                     delay: idx * 40, dur: 1000 + Math.random() * 200,
                     spin: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 3) * Math.PI * 2,
                     rest: (Math.random() - 0.5) * 0.18, flips: 3 + Math.floor(Math.random() * 3), bounces: 2 + Math.floor(Math.random() * 2),
@@ -498,7 +600,10 @@
             function flicker(it, t) {
                 const k = Math.floor(t / 70) + it.idx * 7;
                 const x = Math.sin(k * 12.9898 + it.sides * 78.233) * 43758.5453;
-                return 1 + Math.floor((x - Math.floor(x)) * it.sides);
+                const f = x - Math.floor(x);
+                if (it.kind === 'tens') return tensText(Math.floor(f * 10) * 10);
+                if (it.kind === 'ones') return Math.floor(f * 10);
+                return 1 + Math.floor(f * it.sides);
             }
 
             function itemState(it, t) {
@@ -511,7 +616,7 @@
                     p, hop, hopRatio: clamp01(hop / it.amp),
                     x: it.x0 + (it.tx - it.x0) * e, y: it.y0 + (it.ty - it.y0) * e - hop,
                     rot: it.spin * (1 - e) + it.rest, sx: squash * pop, sy: (1 - (1 - squash) * 0.25) * pop,
-                    label: p < 1 ? flicker(it, t) : it.value
+                    label: p < 1 ? flicker(it, t) : dieLabel(it)
                 };
             }
 
@@ -547,7 +652,7 @@
                 res.dice.slice(ANIM_MAX).forEach(d => {
                     const chip = document.createElement('span');
                     chip.className = 'dchip' + (d.kept ? '' : ' dropped');
-                    chip.style.background = colorFor(d.sides); chip.textContent = d.value;
+                    chip.style.background = colorFor(d.sides); chip.textContent = dieLabel(d);
                     moreEl.appendChild(chip);
                 });
             }
@@ -652,15 +757,58 @@
             function setMod(v) { modInput.value = Math.max(-99, Math.min(99, v)); refresh(); }
             const fullExpr = (base) => { const m = getMod(); return m ? base + (m < 0 ? '-' : '+') + Math.abs(m) : base; };
 
+            // ---- Dice term at the cursor, and advantage / disadvantage on it ----
+            const caret = () => (typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length);
+            const SUFFIX = '(?:(?:kh|kl|dh|dl)\\d*|k\\d*|d\\d+)?(?:(?:min|max)\\d+)*';
+            // The smallest dice term (with its modifiers) or ( ) / { } group, with its suffix, that holds the cursor
+            function termAt(str, pos) {
+                const cands = [], re = new RegExp('(\\d*)d(?:%|\\d+)(?:[bp]\\d*)?!?' + SUFFIX, 'gi');
+                let m;
+                while ((m = re.exec(str))) {
+                    if (m[0].length === 0) { re.lastIndex++; continue; }
+                    if (m.index > 0 && (str[m.index - 1] === ')' || str[m.index - 1] === '}')) continue; // a shorthand like )d1 is a suffix, not a die
+                    cands.push({ start: m.index, end: m.index + m[0].length });
+                }
+                const stack = [];
+                for (let idx = 0; idx < str.length; idx++) {
+                    const ch = str[idx];
+                    if (ch === '(' || ch === '{') stack.push(idx);
+                    else if (ch === ')' || ch === '}') {
+                        const st = stack.pop();
+                        if (st === undefined) continue;
+                        cands.push({ start: st, end: idx + 1 + new RegExp('^' + SUFFIX, 'i').exec(str.slice(idx + 1))[0].length });
+                    }
+                }
+                const hit = cands.filter(c => pos >= c.start && pos <= c.end).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
+                return hit ? { start: hit.start, end: hit.end, text: str.slice(hit.start, hit.end) } : null;
+            }
+            const isSingleDie = (c) => /^1?d(\d+|%)$/.test(c);
+            // 1dN becomes 2dNkh1 (or kl1); any other term T becomes (T, T)kh1 (or kl1)
+            function advText(term, mode) {
+                const m = /^1?d(\d+|%)$/.exec(term);
+                return m ? '2d' + m[1] + mode + '1' : '(' + term + ', ' + term + ')' + mode + '1';
+            }
+            function advDis(mode) {
+                const compact = input.value.toLowerCase().replace(/\s+/g, '');
+                if (!rollBtn.disabled && isSingleDie(compact)) { doRoll(advText(compact, mode)); return; } // one die alone: roll it now, box unchanged
+                const t = termAt(input.value, caret());
+                if (!t) return;
+                const rep = advText(t.text.toLowerCase().replace(/\s+/g, ''), mode);
+                input.value = input.value.slice(0, t.start) + rep + input.value.slice(t.end);
+                const np = t.start + rep.length;
+                input.setSelectionRange(np, np);
+                refresh();
+            }
+
             function refresh() {
                 const base = input.value.trim();
                 let ok = false, err = '';
-                if (base) { try { rollDice(base); ok = true; } catch (e) { err = niceError(e); } }
+                if (base) { try { rollDice(base, true); ok = true; } catch (e) { err = niceError(e); } }
                 msgEl.textContent = err; input.classList.toggle('bad', !!err);
                 previewEl.textContent = ok ? 'Rolls: ' + fullExpr(base) : '';
                 rollBtn.disabled = !ok;
-                const single = ok && /^1?d20$/.test(base.toLowerCase().replace(/\s+/g, ''));
-                advBtn.disabled = !single; disBtn.disabled = !single;
+                const canAdv = (ok && isSingleDie(base.toLowerCase().replace(/\s+/g, ''))) || !!termAt(input.value, caret());
+                advBtn.disabled = !canAdv; disBtn.disabled = !canAdv;
                 clearBtn.disabled = !input.value.length;
             }
 
@@ -713,10 +861,11 @@
             fab.addEventListener('click', () => { tray.classList.contains('open') ? closeTray() : openTray(); });
             closeBtn.addEventListener('click', closeTray);
             input.addEventListener('input', refresh);
+            document.addEventListener('selectionchange', () => { if (document.activeElement === input) refresh(); });
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !rollBtn.disabled) doRoll(input.value); });
             rollBtn.addEventListener('click', () => doRoll(input.value));
-            advBtn.addEventListener('click', () => doRoll('2d20kh1'));
-            disBtn.addEventListener('click', () => doRoll('2d20kl1'));
+            advBtn.addEventListener('click', () => advDis('kh'));
+            disBtn.addEventListener('click', () => advDis('kl'));
             clearBtn.addEventListener('click', () => { input.value = ''; refresh(); });
             modMinus.addEventListener('click', () => setMod(getMod() - 1));
             modPlus.addEventListener('click', () => setMod(getMod() + 1));
