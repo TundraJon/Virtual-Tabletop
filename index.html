@@ -4,7 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Micro VTT</title>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -89,34 +89,42 @@
 
         <div id="diceTray" aria-hidden="true">
             <div class="dice-head"><h3>DICE ROLLER</h3><button id="diceClose" class="close-btn" aria-label="Close dice roller">[X]</button></div>
-            <div id="diceStage">
-                <canvas id="diceCanvas"></canvas>
-                <div id="diceTotal"></div>
-            </div>
-            <div id="diceText"></div>
-            <div id="diceMore"></div>
-            <div class="dice-body">
-                <input id="diceExpr" type="text" placeholder="3d6+2   4d6dl1   2d20kh1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Dice notation">
-                <div id="diceMsg"></div>
-                <div id="dicePad"></div>
-                <div class="dice-row">
-                    <div class="dice-mod">
-                        <button id="diceModMinus" class="dbtn" aria-label="Decrease modifier">&minus;</button>
-                        <input id="diceMod" type="number" value="0" min="-99" max="99" inputmode="numeric" aria-label="Modifier">
-                        <button id="diceModPlus" class="dbtn" aria-label="Increase modifier">+</button>
-                    </div>
-                    <button id="diceAdv" class="dbtn dbtn-wide">ADV</button>
-                    <button id="diceDis" class="dbtn dbtn-wide">DIS</button>
-                    <button id="diceClear" class="dbtn dbtn-wide">CLEAR</button>
+            <div id="dicePinned">
+                <div class="dice-exprrow">
+                    <input id="diceExpr" type="text" inputmode="none" placeholder="3d6+2   4d6dl1   2d20kh1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Dice notation">
+                    <button id="diceKb" class="dbtn" aria-pressed="false" aria-label="Show phone keyboard"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 10h1M9.5 10h1M13 10h1M16.5 10h1M6 14h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
                 </div>
+                <div id="diceMsg"></div>
                 <div id="dicePreview"></div>
-                <button id="diceRollBtn">ROLL</button>
-                <div class="dice-hist-head"><h3>HISTORY</h3><button id="diceHistClear" class="dbtn">CLEAR HISTORY</button></div>
-                <div id="diceHist"></div>
             </div>
+            <div id="diceScroll">
+                <div id="diceStage">
+                    <canvas id="diceCanvas"></canvas>
+                    <div id="diceTotal"></div>
+                </div>
+                <div id="diceText"></div>
+                <div id="diceMore"></div>
+                <div class="dice-body">
+                    <div class="dice-row">
+                        <div class="dice-mod">
+                            <button id="diceModMinus" class="dbtn" aria-label="Decrease modifier">&minus;</button>
+                            <input id="diceMod" type="number" value="0" min="-99" max="99" inputmode="numeric" aria-label="Modifier">
+                            <button id="diceModPlus" class="dbtn" aria-label="Increase modifier">+</button>
+                        </div>
+                        <button id="diceAdv" class="dbtn dbtn-wide">ADV</button>
+                        <button id="diceDis" class="dbtn dbtn-wide">DIS</button>
+                        <button id="diceClear" class="dbtn dbtn-wide">CLEAR</button>
+                    </div>
+                    <div id="diceKeys"></div>
+                    <div id="diceKeyHint">B = extra tens die, keep lowest. P = extra tens die, keep highest. T = number of tens dice, like d100t3kl.</div>
+                    <div class="dice-hist-head"><h3>HISTORY</h3><button id="diceHistClear" class="dbtn">CLEAR HISTORY</button></div>
+                    <div id="diceHist"></div>
+                </div>
+            </div>
+            <div id="diceFoot"><button id="diceRollBtn">ROLL</button></div>
         </div>
     </div>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>

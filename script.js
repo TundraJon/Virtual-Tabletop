@@ -281,11 +281,10 @@
         (function () {
             const MAX_PER_TERM = 20, MAX_TOTAL = 50, MAX_SIDES = 1000, MAX_EXTRA = 20, ANIM_MAX = 12, HIST_MAX = 10, HIST_KEY = 'vttDiceHistory';
             const COLORS = { 2: '#d9b13b', 4: '#35c27a', 6: '#e0554b', 8: '#4b8fe3', 10: '#a853e0', 12: '#e58a3f', 20: '#00d9b0', 30: '#e04ba5', 100: '#bfd140' };
-            const PAD = [2, 4, 6, 8, 10, 12, 20, 30, 100, 'X'];
             const el = (id) => document.getElementById(id);
             const tray = el('diceTray'), fab = el('diceFab'), closeBtn = el('diceClose'), stage = el('diceStage');
             const cv = el('diceCanvas'), dctx = cv.getContext('2d'), totalEl = el('diceTotal'), textEl = el('diceText'), moreEl = el('diceMore');
-            const input = el('diceExpr'), msgEl = el('diceMsg'), padEl = el('dicePad'), rollBtn = el('diceRollBtn');
+            const input = el('diceExpr'), msgEl = el('diceMsg'), keysEl = el('diceKeys'), scrollEl = el('diceScroll'), kbBtn = el('diceKb'), rollBtn = el('diceRollBtn');
             const advBtn = el('diceAdv'), disBtn = el('diceDis'), clearBtn = el('diceClear');
             const modMinus = el('diceModMinus'), modPlus = el('diceModPlus'), modInput = el('diceMod');
             const previewEl = el('dicePreview'), histEl = el('diceHist'), histClear = el('diceHistClear');
@@ -816,11 +815,20 @@
                 refresh();
             }
 
+            // The red error message waits 700 ms after the last change, so half-built expressions do not flash errors. ROLL still disables at once.
+            let msgTimer = 0, pendingErr = '';
+            function setMsg(err) {
+                if (!err) { clearTimeout(msgTimer); pendingErr = ''; msgEl.textContent = ''; input.classList.remove('bad'); return; }
+                if (err === pendingErr) return; // already showing, or waiting to show, this message
+                pendingErr = err; clearTimeout(msgTimer);
+                msgEl.textContent = ''; input.classList.remove('bad');
+                msgTimer = setTimeout(() => { msgEl.textContent = err; input.classList.add('bad'); }, 700);
+            }
             function refresh() {
                 const base = input.value.trim();
                 let ok = false, err = '';
                 if (base) { try { rollDice(base, true); ok = true; } catch (e) { err = niceError(e); } }
-                msgEl.textContent = err; input.classList.toggle('bad', !!err);
+                setMsg(err);
                 previewEl.textContent = ok ? 'Rolls: ' + fullExpr(base) : '';
                 rollBtn.disabled = !ok;
                 const canAdv = (ok && isSingleDie(base.toLowerCase().replace(/\s+/g, ''))) || !!termAt(input.value, caret());
@@ -837,35 +845,55 @@
                 const hist = loadHist(); hist.unshift({ expr: expr, text: res.text, total: res.total, time: Date.now() });
                 saveHist(hist.slice(0, HIST_MAX)); renderHist();
                 startRoll(res);
+                scrollEl.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' }); // bring the dice into view
             }
 
-            function addDie(sides) {
-                const S = String(sides), v = input.value;
-                const re = new RegExp('(^|[^0-9a-z])(\\d*)d' + S + '(?![0-9])', 'i'), m = re.exec(v);
-                if (m) {
-                    const n = m[2] === '' ? 1 : parseInt(m[2], 10), idx = m.index + m[1].length;
-                    input.value = v.slice(0, idx) + (n + 1) + v.slice(idx + m[2].length);
-                } else {
-                    const t = v.trim();
-                    input.value = t === '' ? '1d' + S : (/[+\-*/(]$/.test(t) ? t + '1d' + S : t + '+1d' + S);
-                }
-                refresh();
+            // ---- On-screen keypad: every key inserts exactly what it says, at the cursor ----
+            const KEY_ROWS = [
+                { cols: 5, keys: [['d2'], ['d4'], ['d6'], ['d8'], ['d10']] },
+                { cols: 5, keys: [['d12'], ['d20'], ['d30'], ['d100'], ['d']] },
+                { cols: 5, keys: [['1'], ['2'], ['3'], ['4'], ['5']] },
+                { cols: 5, keys: [['6'], ['7'], ['8'], ['9'], ['0']] },
+                { cols: 6, keys: [['+'], ['\u2212', '-'], ['\u00d7', '*'], ['\u00f7', '/'], ['('], [')']] },
+                { cols: 7, keys: [[','], ['!'], ['B', 'b'], ['P', 'p'], ['T', 't'], ['MIN', 'min'], ['MAX', 'max']] },
+                { cols: 5, keys: [['KH', 'kh'], ['KL', 'kl'], ['DH', 'dh'], ['DL', 'dl'], ['DEL']] },
+                { cols: 1, keys: [['4D6KH3', '4d6kh3']], quick: true }
+            ];
+            const selStart = () => (typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length);
+            const selEnd = () => (typeof input.selectionEnd === 'number' ? input.selectionEnd : selStart());
+            function setCaret(pos) { input.focus({ preventScroll: true }); input.setSelectionRange(pos, pos); refresh(); }
+            function insertText(txt) {
+                const v = input.value, s = selStart(), e = selEnd();
+                input.value = v.slice(0, s) + txt + v.slice(e);
+                setCaret(s + txt.length);
             }
-
-            PAD.forEach(s => {
-                const b = document.createElement('button'); b.className = 'dpad-btn'; b.textContent = s === 'X' ? 'dX' : 'd' + s;
-                b.style.setProperty('--c', s === 'X' ? '#8da2b5' : colorFor(s));
-                b.addEventListener('click', () => {
-                    if (s !== 'X') { addDie(s); return; }
-                    const v = prompt('Number of sides (2 to ' + MAX_SIDES + '):', '7');
-                    if (v === null) return;
-                    const n = parseInt(v, 10);
-                    if (isNaN(n) || n < 2 || n > MAX_SIDES) { msgEl.textContent = 'A die needs 2 to ' + MAX_SIDES + ' sides.'; return; }
-                    addDie(n);
+            function backspace() {
+                const v = input.value, s = selStart(), e = selEnd();
+                if (s !== e) { input.value = v.slice(0, s) + v.slice(e); setCaret(s); }
+                else if (s > 0) { input.value = v.slice(0, s - 1) + v.slice(s); setCaret(s - 1); }
+            }
+            KEY_ROWS.forEach(row => {
+                const r = document.createElement('div'); r.className = 'krow'; r.style.setProperty('--cols', row.cols);
+                row.keys.forEach(k => {
+                    const label = k[0], b = document.createElement('button');
+                    b.type = 'button'; b.className = 'dkey'; b.textContent = label;
+                    const dm = /^d(\d+)$/.exec(label);
+                    if (dm) { b.classList.add('dice'); b.style.setProperty('--c', colorFor(Number(dm[1]))); }
+                    if (row.quick) b.classList.add('quick');
+                    if (label === 'DEL') { b.classList.add('del'); b.setAttribute('aria-label', 'Delete'); b.addEventListener('click', backspace); }
+                    else b.addEventListener('click', () => insertText(k.length > 1 ? k[1] : label));
+                    r.appendChild(b);
                 });
-                padEl.appendChild(b);
+                keysEl.appendChild(r);
             });
-
+            keysEl.addEventListener('mousedown', (e) => e.preventDefault()); // keep the cursor in the box when a key is pressed
+            kbBtn.addEventListener('click', () => { // show or hide the phone keyboard
+                const on = input.getAttribute('inputmode') === 'none';
+                input.setAttribute('inputmode', on ? 'text' : 'none');
+                kbBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                kbBtn.setAttribute('aria-label', on ? 'Hide phone keyboard' : 'Show phone keyboard');
+                input.blur(); input.focus({ preventScroll: true });
+            });
             function openTray() {
                 tray.classList.add('open'); tray.setAttribute('aria-hidden', 'false');
                 document.getElementById('sidebar').classList.add('minimized');
