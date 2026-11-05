@@ -190,7 +190,6 @@ All items below are ideas only. None are designed, queued or authorized to build
 - **Save and restore:** a reload wipes tokens, calibration and the selected map; only the folder names are remembered. Open questions: autosave to localStorage, export/import as a file, or both? Map and token images are blob URLs and can't be saved directly.
 - **Feet-per-square stored as a string:** `grid.ftPerSq = this.value` stores text, not a number. Distance math currently works by coercion. Log only; fix if/when authorized.
 - **Undo:** no way to undo a token move, delete or HP change.
-- **CLAUDE.md cache-busting note is out of date:** it still says "Currently N/A: the app is a single self-contained `index.html`." Since Build Log 1 the app is split into `index.html`, `styles.css` and `script.js`, so cache-busting applies and is being followed. Log only; update the note if/when authorized.
 
 ### Table features other VTTs do well
 

@@ -63,4 +63,16 @@ A design settled in one sitting can skip the Planner and go straight to the Queu
 
 ## Cache-busting
 
-Only applies if the app is split into separate local `.js`/`.css` files served directly (no bundler). Then each tag carries a version query string (`script.js?v=N`), and any edit to that file bumps its number by exactly 1 in the same change. The Build Log entry records before and after (`script.js?v=70→71`). Currently N/A: the app is a single self-contained `index.html`.
+The app is split into `index.html`, `styles.css` and `script.js`, served directly with no bundler. The two asset tags in `index.html` carry a version query string (`styles.css?v=N`, `script.js?v=N`). Any edit to `styles.css` or `script.js` bumps that file's number by exactly 1 in the same change; a file that did not change keeps its number. The Build Log entry records before and after (`script.js?v=6→7`).
+
+## Hosting and caching
+
+The app is published with GitHub Pages at https://tundrajon.github.io/Virtual-Tabletop/ and pages are cached by browsers for up to 10 minutes. If the user says a change is not showing, or something looks half-updated, first suggest an incognito tab or adding `?v=N` to the address. This was the cause once already (a fix that was live but not visible).
+
+## File encoding
+
+`index.html` has no charset declaration, so `script.js` must stay pure ASCII. Write any non-ASCII character in it as a `\u` escape (for example the multiply sign as `\u00d7`). After editing `script.js`, check that it has no raw non-ASCII characters. This broke twice (the multiply and divide signs, and the minus key).
+
+## Changes to this file
+
+This file is mine to edit. Whenever I add or change something here, I tell the user in my reply: that I did it and exactly what changed.
