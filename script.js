@@ -118,6 +118,15 @@
             if (window.boardHooks) boardHooks.gridApplied();
         }
 
+        // A token whose image is not available (no token folder loaded, file missing) is drawn as a colored disk with its first letter
+        function tokenFallback(t, s) {
+            let h = 0; for (let i = 0; i < t.baseName.length; i++) h = (h * 31 + t.baseName.charCodeAt(i)) % 360;
+            ctx.fillStyle = `hsl(${h}, 55%, 42%)`; ctx.beginPath(); ctx.arc(0, 0, s / 2, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2 / scale; ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = `bold ${s * 0.55}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(t.baseName.charAt(0).toUpperCase(), 0, 0);
+        }
+
         function draw() {
             ctx.clearRect(0,0,canvas.width, canvas.height); ctx.save();
             ctx.translate(offset.x, offset.y); ctx.scale(scale, scale);
@@ -146,7 +155,8 @@
 
             tokens.forEach(t => {
                 ctx.save(); ctx.translate(t.x, t.y); const s = grid.size || 50;
-                if (t.img.complete) ctx.drawImage(t.img, -s/2, -s/2, s, s);
+                if (t.img.complete && t.img.naturalWidth > 0) ctx.drawImage(t.img, -s/2, -s/2, s, s);
+                else if (t.img.complete) tokenFallback(t, s);
                 ctx.fillStyle = "black"; ctx.fillRect(-s/2, -s/1.5, s, 6/scale);
                 ctx.fillStyle = (t.hp / t.maxHp > 0.5) ? "#00ff00" : (t.hp / t.maxHp > 0.2 ? "#ffff00" : "#ff0000");
                 ctx.fillRect(-s/2, -s/1.5, s * Math.max(0, t.hp/t.maxHp), 6/scale);
@@ -1193,6 +1203,85 @@
             $('btnNewBoard').addEventListener('click', newBoard);
             setInterval(tick, 500);
             showInfo();
+        })();
+
+        // ===== BOARD STORAGE: named saves, and export / import =====
+        (function () {
+            const SAVES_KEY = 'vttSaves', MAX_SAVES = 50, MAX_NAME = 40, MAX_FILE = 2 * 1024 * 1024, MAX_TOKENS = 200;
+            const $ = (id) => document.getElementById(id);
+            const msgEl = $('saveMsg'), listEl = $('saveList'), nameEl = $('saveName'), fileEl = $('inputImport');
+            const say = (t) => { msgEl.textContent = t; };
+            const loadAll = () => { try { const a = JSON.parse(localStorage.getItem(SAVES_KEY)); return Array.isArray(a) ? a.filter(x => x && typeof x.name === 'string' && x.state) : []; } catch (e) { return []; } };
+            const storeAll = (a) => { try { localStorage.setItem(SAVES_KEY, JSON.stringify(a)); return true; } catch (e) { return false; } };
+
+            // Puts a board on screen. A map that is not in the loaded library is reported; its tokens, grid and settings still come back.
+            function loadBoard(st, label) {
+                const r = boardHooks.applyState(st);
+                if (r.map === 'missing') { const t = 'This save uses map "' + st.map.name + '". Load your map folder and pick it.'; boardHooks.note(t); say('Loaded "' + label + '". ' + t); }
+                else say('Loaded "' + label + '".');
+            }
+            function render() {
+                const all = loadAll(); listEl.innerHTML = '';
+                if (!all.length) { const d = document.createElement('div'); d.className = 'save-meta'; d.textContent = 'No saved boards yet.'; listEl.appendChild(d); return; }
+                all.forEach(e => {
+                    const st = boardHooks.cleanState(e.state);
+                    const row = document.createElement('div'); row.className = 'save-item';
+                    const nm = document.createElement('div'); nm.className = 'save-name'; nm.textContent = e.name;
+                    const meta = document.createElement('div'); meta.className = 'save-meta';
+                    meta.textContent = st ? (st.map ? st.map.name : 'no map') + ' | ' + st.tokens.length + ' token' + (st.tokens.length === 1 ? '' : 's') + ' | ' + new Date(e.date).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'damaged save';
+                    const btns = document.createElement('div'); btns.className = 'save-btns';
+                    const mk = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.addEventListener('click', fn); btns.appendChild(b); };
+                    mk('LOAD', () => { if (!st) { say('That save is damaged.'); return; } loadBoard(st, e.name); });
+                    mk('RENAME', () => {
+                        const v = prompt('New name:', e.name); if (v === null) return;
+                        const n = v.trim().slice(0, MAX_NAME); if (!n) return;
+                        const cur = loadAll();
+                        if (cur.some(x => x.name === n && x.name !== e.name)) { say('That name is already used.'); return; }
+                        const t = cur.find(x => x.name === e.name); if (t) t.name = n;
+                        say(storeAll(cur) ? 'Renamed to "' + n + '".' : 'This browser would not save that.'); render();
+                    });
+                    mk('DELETE', () => { if (!confirm('Delete the saved board "' + e.name + '"?')) return; storeAll(loadAll().filter(x => x.name !== e.name)); say('Deleted "' + e.name + '".'); render(); });
+                    row.appendChild(nm); row.appendChild(meta); row.appendChild(btns); listEl.appendChild(row);
+                });
+            }
+            $('btnSave').addEventListener('click', () => {
+                const n = nameEl.value.trim().slice(0, MAX_NAME);
+                if (!n) { say('Type a name first.'); return; }
+                const all = loadAll(), at = all.findIndex(x => x.name === n);
+                if (at >= 0 && !confirm('Replace the saved board "' + n + '"?')) return;
+                if (at < 0 && all.length >= MAX_SAVES) { say('Limit of ' + MAX_SAVES + ' saved boards. Delete one first.'); return; }
+                const entry = { name: n, date: Date.now(), state: boardHooks.captureState() };
+                if (at >= 0) all[at] = entry; else all.push(entry);
+                say(storeAll(all) ? 'Saved "' + n + '".' : 'This browser would not save it.'); render();
+            });
+
+            // Export: the board's state as a small file (no images)
+            $('btnExport').addEventListener('click', () => {
+                const st = boardHooks.captureState();
+                const nm = (nameEl.value.trim() || (st.map ? st.map.name : 'board')).replace(/[^\w\- ]+/g, '').trim().slice(0, MAX_NAME) || 'board';
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(st)], { type: 'application/json' }));
+                a.download = nm + '.vtt.json'; document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 2000); say('Exported ' + nm + '.vtt.json.');
+            });
+            // Import: validated, and nothing changes unless the file is a good board
+            $('btnImport').addEventListener('click', () => fileEl.click());
+            fileEl.addEventListener('change', async () => {
+                const f = fileEl.files && fileEl.files[0]; fileEl.value = '';
+                if (!f) return;
+                const bad = (why) => say(why + ' Nothing was changed.');
+                if (f.size > MAX_FILE) { bad('That file is too large (limit 2 MB).'); return; }
+                let obj; try { obj = JSON.parse(await f.text()); } catch (e) { bad('That file is not readable as a board.'); return; }
+                if (!obj || typeof obj !== 'object' || obj.v !== 1) { bad('That file is not a board from this app, or it is a different version.'); return; }
+                if (Array.isArray(obj.tokens) && obj.tokens.length > MAX_TOKENS) { bad('That file has too many tokens (limit ' + MAX_TOKENS + ').'); return; }
+                const st = boardHooks.cleanState(obj);
+                if (!st) { bad('That file is not a valid board.'); return; }
+                loadBoard(st, f.name);
+            });
+            // Loading the token folder later gives tokens that have no image their picture
+            $('inputTokenDir').addEventListener('change', () => {
+                tokens.forEach(t => { const url = tokenLib[t.baseName]; if (url && !(t.img.complete && t.img.naturalWidth > 0) && t.img.src !== url) { t.img = new Image(); t.img.src = url; } });
+            });
+            render();
         })();
 
         window.onclick = (e) => { if(e.target.tagName !== 'BUTTON' && !e.target.classList.contains('menu-item')) menu.style.display = 'none'; };

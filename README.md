@@ -206,24 +206,31 @@ Queue item B. The app reopens where you left off. Only the current map's image a
 - First-run test issues, all my test's mistakes (not the app): the browser's simulated finger-lift closes the long-press menu, so menu picks are made while the finger is still down; token positions must come from the saved board because the existing app snaps a token to the grid whenever it is touched.
 - **Needs a real-device check:** that the board comes back after closing and reopening Chrome on the phone, and how much storage a real map uses.
 
+## Build Log 12 (completed)
+### Named saves, export / import, and a letter disk for tokens with no image
+
+Queue item C. Keep several encounters by name and move a board between devices. Saves hold state only, no images.
+
+- [x] `script.js`: new "BOARD STORAGE: named saves, and export / import" section. Saves live in localStorage key `vttSaves` (name up to 40 characters, up to 50 saves). SAVE stores the current board (`boardHooks.captureState`); an existing name asks before replacing (`confirm`). The list shows each save's name, map, token count and date with LOAD, RENAME (a used name is refused) and DELETE (asks first).
+- [x] Loading a save (`loadBoard`, through `boardHooks.applyState`) replaces the board. If its map is not in the loaded library the tokens, grid and settings still come back and a message says `This save uses map "<name>". Load your map folder and pick it.` (also in the autosave note). A loaded or imported board becomes the autosave automatically.
+- [x] EXPORT downloads the current board as `<name>.vtt.json` (state only, no images; the name field or the map name, cleaned). IMPORT checks the file before using it: at most 2 MB, readable JSON, version 1, at most 200 tokens, and every field cleaned by `cleanState`; anything else shows an error ending "Nothing was changed." and the board is untouched.
+- [x] `index.html` / `styles.css`: Saves tab gets SAVE THIS BOARD (name field, SAVE, message), SAVED BOARDS (the list) and FILE (EXPORT BOARD, IMPORT BOARD) panels.
+- [x] Tokens whose image is not available draw as a colored disk (color from the token name) with its first letter (`tokenFallback` in `draw`), so they are never invisible. Small edit to the token drawing line in `draw`.
+- [x] Loading the token folder later gives board tokens that have no image their picture (a `change` listener on the token folder input), so a loaded save or import whose tokens were showing as disks fills in.
+- [x] Cache-bust bumped: script.js?v=9→10, styles.css?v=9→10.
+
+**Bug found and fixed during verification:** after importing a board with no folders loaded and then loading the token folder, the tokens stayed letter disks until a reload, because loading a folder never re-linked tokens already on the board. Fixed with the token-folder listener above.
+
+**Verification:** Playwright (Chromium, 1000x600, real touch gestures through the browser's touch API, test maps and tokens, a real file download), 28 checks, all pass, zero JS errors, 25 seconds.
+- Saving: an empty name is refused; saved A (2 tokens), B (1 token, panned view) and C (2 tokens) with the right map and token count in the list; overwriting A asks first, declining leaves it unchanged, accepting replaces it.
+- Loading B gives 1 token and loading C gives 2; renaming C to C2 works and renaming to a used name is refused; deleting B asks, declining keeps it and accepting removes it. After loading A and reloading the page, the board is A (a loaded board becomes the autosave) and the saves are still there.
+- Export downloaded `Export Test.vtt.json` (version 1, map cave, 1 token, no image data). Importing it into a fresh browser with no folders said the map was missing (message and note), drew the token as a letter disk (checked on the canvas pixels), and after the map and token folders were loaded the map showed and the token used its image.
+- Bad files (corrupt JSON, wrong version, 201 tokens, over 2 MB) each showed an error ending "Nothing was changed." and left the token in place. Screenshots of the Saves tab and of the letter disks reviewed.
+- **Needs a real-device check:** the export download and the import file picker on Android Chrome.
+
 ## Build Queue
 
-Build C next (A and B are done, see Build Logs 10 and 11). Nothing stores image libraries; only the current map, the tokens on the board, grid definitions and small state records are saved, all on the device.
-
-### C. Named saves, and export / import file
-
-**Not yet authorized to build.**
-
-Keep several encounters by name and move a board between devices. Saves hold state only, no images.
-
-- [ ] **Saves tab:** a name field and SAVE button store the current board (the same state as item B) under that name in localStorage (`vttSaves`); names up to 40 characters, up to 50 saves. Saving over an existing name asks first.
-- [ ] **List:** each save shows its name, map name, token count and date, with LOAD, RENAME and DELETE (confirmation before delete).
-- [ ] **Loading a save** replaces the current board. If its map name and size match the map already on screen, nothing else is needed. If its map is in the loaded library, it is picked automatically. Otherwise the tokens, grid and settings are restored and a message says "This save uses map <name>. Load your map folder and pick it." Tokens whose image is not in the token library draw as a colored disk with their first letter, so they are never invisible. *(The disk is added by Claude. Change before authorizing if wanted.)*
-- [ ] **EXPORT:** downloads the current board as a file `<name>.vtt.json` (state only). **IMPORT:** choose such a file; it is validated (version, shape, numbers finite, at most 200 tokens, unknown fields ignored) and loaded like a save. A bad file shows a clear error and changes nothing.
-- [ ] Autosave (item B) keeps running; loading or importing a board also becomes the autosave.
-- [ ] **Files:** `script.js`, `index.html`, `styles.css`. Cache-bust: script.js?v=9→10, styles.css?v=9→10.
-
-Verification plan (targeted, about 2 to 3 minutes): save two boards under different names, load each, rename and delete (with confirmation), overwrite prompt; loading a save whose map is loaded, in the library, and missing; missing token images draw as letter disks; export a file and import it back (identical board); importing a corrupt, wrong-version and oversized file shows an error and changes nothing; zero JS errors. **Needs a real-device check:** the export download and import file picker on Android Chrome.
+_Empty — nothing queued right now._
 
 ## Build Planner
 

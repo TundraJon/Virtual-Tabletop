@@ -4,7 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Micro VTT</title>
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -68,6 +68,22 @@
                 <div id="autoInfo" class="count-display"></div>
                 <div id="autoNote" class="auto-note"></div>
                 <button class="action-btn" id="btnNewBoard" style="color:#ff8a7a;">NEW BOARD</button>
+            </div>
+            <div class="panel">
+                <h3>SAVE THIS BOARD</h3>
+                <input type="text" id="saveName" placeholder="Name (for example Goblin Cave)" maxlength="40" autocomplete="off">
+                <button class="action-btn" id="btnSave">SAVE</button>
+                <div id="saveMsg" class="auto-note"></div>
+            </div>
+            <div class="panel">
+                <h3>SAVED BOARDS</h3>
+                <div id="saveList"></div>
+            </div>
+            <div class="panel">
+                <h3>FILE</h3>
+                <button class="action-btn" id="btnExport">EXPORT BOARD</button>
+                <button class="action-btn" id="btnImport">IMPORT BOARD</button>
+                <input type="file" id="inputImport" accept=".json,application/json" style="display:none">
             </div>
         </div>
 
@@ -137,6 +153,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=10"></script>
 </body>
 </html>

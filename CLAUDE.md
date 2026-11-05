@@ -59,7 +59,8 @@ A design settled in one sitting can skip the Planner and go straight to the Queu
 6. Only run tests directly affected by the change or that interact with it. No full regression runs for small changes. Keep tests under 3 minutes normally and about 1 minute for simple changes.
 7. Test realistic data, not just an empty app.
 8. **Reproduce a reported bug first.** Confirm the exact symptom fails, then find the root cause, fix it, and re-run the same reproduction.
-9. If something can't be verified here (real touch gestures, long-press, pinch, live network), say so explicitly and flag it for a real-device check. Don't silently skip it.
+9. **Long-press menus:** with the browser's simulated touch, lifting the finger sends a click that closes the menu, so pick the menu item while the finger is still down, then lift.
+10. If something can't be verified here (real touch gestures, long-press, pinch, live network), say so explicitly and flag it for a real-device check. Don't silently skip it.
 
 ## Cache-busting
 

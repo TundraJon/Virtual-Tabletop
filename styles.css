@@ -114,3 +114,9 @@
         /* Board storage */
         .grid-mem { font-size: 11px; text-align: center; color: #888; margin: 6px 0 2px 0; min-height: 14px; }
         .auto-note { font-size: 11px; color: #ffcc66; margin: 4px 0 8px 0; min-height: 14px; }
+        .save-item { padding: 10px 0; border-bottom: 1px solid #333; }
+        .save-name { font-size: 14px; font-weight: bold; color: #fff; word-break: break-word; }
+        .save-meta { font-size: 11px; color: #888; margin: 2px 0 8px 0; }
+        .save-btns { display: flex; gap: 6px; }
+        .save-btns button { flex: 1; padding: 10px 0; background: #333; color: #fff; border: 1px solid #555; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; font-family: inherit; }
+        .save-btns button:last-child { color: #ff8a7a; }
