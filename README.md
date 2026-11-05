@@ -176,7 +176,57 @@ Requested: raise the dice roller card to almost touch the menu button and give t
 
 ## Build Queue
 
-_Empty — nothing queued right now._
+Build these in order: A, then B, then C. Nothing stores image libraries; only the current map, the tokens on the board, grid definitions and small state records are saved, all on the device.
+
+### A. Grid memory by map name
+
+**Not yet authorized to build.**
+
+When a map is picked, its grid comes back automatically if it was calibrated before. No images are stored.
+
+- [ ] **Key:** the map's file name (without extension, as it appears in the dropdown) plus the image's pixel size, `name|WIDTHxHEIGHT`, so a different image with the same name never gets the wrong grid.
+- [ ] **What is saved** (localStorage key `vttGrids`, one small record per key): the grid rectangle and size (`x1`, `y1`, `x2`, `y2`, `size`), the two calibration points, the squares-across number, and feet per square. Grid color stays a global setting. At most 200 records; the oldest is dropped past that.
+- [ ] **When it saves:** each time APPLY GRID is pressed, and when FEET PER SQUARE changes while the map has a grid.
+- [ ] **When it loads:** after a map image finishes loading in `changeMap`, if a record exists: restore the grid, calibration points (so SET TL and SET BR show as locked), the squares-across field, and feet per square; hide the pins; refresh the "Squares Down" display. With no record, behavior is exactly as today (grid reset, calibrate as usual).
+- [ ] **Status line** in the Map tab under APPLY GRID: "Saved grid loaded" or "No saved grid for this map". *(Added by Claude. Change before authorizing if wanted.)*
+- [ ] **FORGET GRID button** next to it: deletes that map's record and clears the grid, so a bad calibration can be redone. Recalibrating and pressing APPLY GRID also overwrites the record. *(Added by Claude. Change before authorizing if wanted.)*
+- [ ] **Safe by default:** every storage call is in try/catch and the app works without storage.
+- [ ] **Files:** `script.js`, `index.html` (status line and button), `styles.css` (small). Cache-bust: script.js?v=7→8, styles.css?v=7→8.
+
+Verification plan (targeted, about 2 minutes): load a test map folder, calibrate by tapping the corners, apply the grid with a squares-across number and feet per square, reload the page, load the same folder, pick the same map, and check the grid and fields come back (status text, the squares-down display, the squares-across and feet fields, and a canvas screenshot with grid lines); a different map gets no grid; a different-size image with the same name gets no grid; FORGET GRID clears it; recalibrating overwrites; storage disabled still works; zero JS errors. **Needs a real-device check:** calibration with real touches.
+
+### B. Autosave the board, with the current map and board tokens
+
+**Not yet authorized to build.**
+
+The app reopens where you left off. Images stored are only the current map and the tokens on the board (a handful of files), never the folders' libraries.
+
+- [ ] **State saved** (localStorage key `vttBoard`, with a version number): map name and size, grid (as in item A), calibration points, squares-across, feet per square, grid color, view (zoom and offset), and every token (`id`, `x`, `y`, `baseName`, `instanceNum`, `hp`, `maxHp`).
+- [ ] **When it saves:** about 500 ms after any change (a debounced save): token added, moved, HP changed or deleted; grid applied or forgotten; feet per square or grid color changed; map changed; and when a pan or zoom gesture ends.
+- [ ] **Images** (IndexedDB database `vttBoardImages`): the current map file under one key, and one entry per token name that is on the board. On each save, entries for tokens no longer on the board are removed, and the map entry is replaced when the map changes. This needs the picked `File` objects kept alongside the object URLs in `handleFolder` (small change to existing code).
+- [ ] **Restore on open:** read the state, rebuild object URLs from the stored images, and put the map and token names into the libraries so they appear in the dropdown and token menu until the folders are loaded; put tokens back with their images, restore the grid, view and settings. Loading the folders later adds to the libraries as it does today.
+- [ ] **If the stored map image is missing** (storage cleared by the browser): restore tokens and settings anyway and show a message "Map image missing: load your map folder and pick <name>"; picking that map then loads its grid by name (item A).
+- [ ] **New "Saves" tab** in the sidebar (tabs become Assets, Map, Saves, Help) with a NEW BOARD button (confirmation first; clears the autosave and stored images, tokens and map) and a line showing stored image size and last autosave time.
+- [ ] **Storage care:** all storage calls in try/catch (the app works without storage); after the first successful save, ask the browser for persistent storage (`navigator.storage.persist()`, best effort).
+- [ ] Unchanged: the dice roller and its history, map/token/calibration behavior, folder status lines.
+- [ ] **Files:** `script.js`, `index.html`, `styles.css`. Cache-bust: script.js?v=8→9, styles.css?v=8→9.
+
+Verification plan (targeted, about 2 to 3 minutes): with a test map and token folder, add tokens, move them, change HP, calibrate, zoom; reload; check the board is back (tokens, positions, HP, grid, zoom, map shown) without picking folders; changing the map replaces the stored map; removing a token drops its stored image; NEW BOARD clears everything after confirmation; missing map image shows the message and still restores tokens; storage disabled still works; the Saves tab shows size and time; zero JS errors. **Needs a real-device check:** that the board comes back after closing and reopening Chrome on the phone, and how much storage it uses.
+
+### C. Named saves, and export / import file
+
+**Not yet authorized to build.**
+
+Keep several encounters by name and move a board between devices. Saves hold state only, no images.
+
+- [ ] **Saves tab:** a name field and SAVE button store the current board (the same state as item B) under that name in localStorage (`vttSaves`); names up to 40 characters, up to 50 saves. Saving over an existing name asks first.
+- [ ] **List:** each save shows its name, map name, token count and date, with LOAD, RENAME and DELETE (confirmation before delete).
+- [ ] **Loading a save** replaces the current board. If its map name and size match the map already on screen, nothing else is needed. If its map is in the loaded library, it is picked automatically. Otherwise the tokens, grid and settings are restored and a message says "This save uses map <name>. Load your map folder and pick it." Tokens whose image is not in the token library draw as a colored disk with their first letter, so they are never invisible. *(The disk is added by Claude. Change before authorizing if wanted.)*
+- [ ] **EXPORT:** downloads the current board as a file `<name>.vtt.json` (state only). **IMPORT:** choose such a file; it is validated (version, shape, numbers finite, at most 200 tokens, unknown fields ignored) and loaded like a save. A bad file shows a clear error and changes nothing.
+- [ ] Autosave (item B) keeps running; loading or importing a board also becomes the autosave.
+- [ ] **Files:** `script.js`, `index.html`, `styles.css`. Cache-bust: script.js?v=9→10, styles.css?v=9→10.
+
+Verification plan (targeted, about 2 to 3 minutes): save two boards under different names, load each, rename and delete (with confirmation), overwrite prompt; loading a save whose map is loaded, in the library, and missing; missing token images draw as letter disks; export a file and import it back (identical board); importing a corrupt, wrong-version and oversized file shows an error and changes nothing; zero JS errors. **Needs a real-device check:** the export download and import file picker on Android Chrome.
 
 ## Build Planner
 
@@ -187,7 +237,6 @@ All items below are ideas only. None are designed, queued or authorized to build
 ### Known gaps in the current app
 
 - **Mouse / desktop input:** the canvas only listens for touch events, so token placement, dragging, panning and zoom do nothing with a mouse. Open question: also add wheel zoom?
-- **Save and restore:** a reload wipes tokens, calibration and the selected map; only the folder names are remembered. Open questions: autosave to localStorage, export/import as a file, or both? Map and token images are blob URLs and can't be saved directly.
 - **Feet-per-square stored as a string:** `grid.ftPerSq = this.value` stores text, not a number. Distance math currently works by coercion. Log only; fix if/when authorized.
 - **Undo:** no way to undo a token move, delete or HP change.
 
@@ -203,7 +252,6 @@ All items below are ideas only. None are designed, queued or authorized to build
 - **True-size mode:** calibrate to the physical screen so one square equals exactly 1 inch, letting a tablet laid flat serve as a map for physical minis. Open question: how to calibrate (known device size, or a measure-with-a-ruler step)?
 - **Custom token stats:** replace the fixed HP bar with user-defined bars (stamina, morale, armor, etc.), keeping the app system-agnostic and suited to custom combat systems. Open questions: how many bars, and how are they defined?
 - **Player view:** a second screen (TV or tablet) shows the map and fog while the phone keeps the GM controls. Open question: how to link the screens with no server?
-- **Encounter presets:** save a map with its tokens, positions and HP as one file and reload it in one tap. Likely shares work with save and restore.
 - **Waypoint ruler:** measure a path with turns, and mark difficult terrain that costs extra movement.
 - **Installable offline app:** make it a PWA, then wrap it for Google Play. Needs the HTML/CSS/JS split (done) and a manifest and service worker.
 
