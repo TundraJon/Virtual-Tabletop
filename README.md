@@ -189,27 +189,26 @@ Queue item A. Picking a map you have calibrated before now brings its grid back.
 **Verification:** Playwright (Chromium, 1000x600, real touch taps for calibration, small flat-color test maps), 20 checks, all pass, zero JS errors, 10 seconds. First pick shows no saved grid and no grid lines; calibrating (squares down 10, 9 squares across, 10 ft) saves and draws grid lines (checked on the canvas pixels); after a page reload the same map restores the grid, fields, locked labels and squares-down display; a different map and a same-named map of a different size get no grid; changed feet per square is remembered; recalibrating overwrites; FORGET GRID clears it and it stays forgotten after a reload; with the new keys blocked in storage the app works and says it could not save.
 - **Needs a real-device check:** calibration and the saved grid with real touches on the phone.
 
+## Build Log 11 (completed)
+### Autosave of the board, with the current map and board tokens
+
+Queue item B. The app reopens where you left off. Only the current map's image and the images of tokens on the board are stored, never the folder libraries.
+
+- [x] `script.js`: new "BOARD STORAGE: autosave" section. A timer (`tick`, every 500 ms) compares the board's state with the last saved copy and saves when it changed, so the existing token, grid and zoom code did not need save calls. It does not save while a finger is on the map (`touching`, `dragging`, `isPinching`), so a drag or pan is saved once it ends. State (`capture`, localStorage `vttBoard` plus `vttBoardAt` for the time): map name and size, grid, calibration points, squares across, feet per square, grid color, zoom and offset, and every token (`id`, `x`, `y`, `baseName`, `instanceNum`, `hp`, `maxHp`).
+- [x] Images (IndexedDB `vttBoardImages`): the current map file and one file per token name on the board, kept in step by `syncImages` (a replaced map or removed token drops its stored file). `handleFolder` now also keeps each picked `File` (`mapFiles`, `tokenFiles`) next to its object URL.
+- [x] Restore on open (`restore`, called after `init()`): reads the state through `cleanState` (a validator that returns a safe state or nothing), rebuilds object URLs from the stored images, puts the restored map and token names into the libraries (the dropdown and token menu work before any folder is loaded), and `applyState` puts tokens, grid, view and settings back. If the stored map image is gone, tokens and settings still return and a note says `Map image missing: load your map folder and pick "<name>".`; picking that map clears the note and loads its grid by name (Build Log 10). `applyState` and `cleanState` are exposed on `boardHooks` for the next build.
+- [x] New "Saves" tab (`index.html`, `styles.css`): AUTOSAVE panel with a line showing stored image size, what is stored and the last autosave time, a note line, and NEW BOARD (asks first; clears the board, the autosave and the stored images, and removes library entries that only came from storage).
+- [x] Storage care: all storage calls are in try/catch; if localStorage refuses, the note says `Autosave is not available in this browser.`; after the first save the browser is asked for persistent storage (best effort).
+- [x] Added during verification: the last autosave time is saved with the board, so it shows after a reload instead of "not yet" (found when the first test run showed that); sizes under 1 MB show in KB.
+- [x] Cache-bust bumped: script.js?v=8→9, styles.css?v=8→9.
+
+**Verification:** Playwright (Chromium, 1000x600, real touch gestures through the browser's touch API: long-press to add tokens, drag, pan; small test maps and tokens), 23 checks, all pass, zero JS errors, 35 seconds. Built a board (two tokens, calibrated grid, panned view, one HP point lost); after a page reload with no folders picked, the map, both tokens, the grid, the view, the dropdown, the HP (11 / 12) and the token menu all came back, and the Saves tab showed "map + 2 tokens" with a last-autosave time. Nothing was saved while a finger was held on a dragged token, and it was saved after the finger lifted. Deleting a token dropped its stored image (map + 1 token) and it stayed gone after a reload. Changing the map replaced the stored map (the new map came back after a reload). With the stored map removed from storage, the reload restored tokens and showed the missing-map note naming the map; picking the map cleared it. NEW BOARD (after confirmation) emptied the board, dropdown and storage, and the empty board stayed empty after a reload. With the new storage keys blocked the app still ran and said autosave was unavailable. Screenshot of the Saves tab reviewed.
+- First-run test issues, all my test's mistakes (not the app): the browser's simulated finger-lift closes the long-press menu, so menu picks are made while the finger is still down; token positions must come from the saved board because the existing app snaps a token to the grid whenever it is touched.
+- **Needs a real-device check:** that the board comes back after closing and reopening Chrome on the phone, and how much storage a real map uses.
+
 ## Build Queue
 
-Build these in order: B, then C (A is done, see Build Log 10). Nothing stores image libraries; only the current map, the tokens on the board, grid definitions and small state records are saved, all on the device.
-
-### B. Autosave the board, with the current map and board tokens
-
-**Not yet authorized to build.**
-
-The app reopens where you left off. Images stored are only the current map and the tokens on the board (a handful of files), never the folders' libraries.
-
-- [ ] **State saved** (localStorage key `vttBoard`, with a version number): map name and size, grid (as in item A), calibration points, squares-across, feet per square, grid color, view (zoom and offset), and every token (`id`, `x`, `y`, `baseName`, `instanceNum`, `hp`, `maxHp`).
-- [ ] **When it saves:** about 500 ms after any change (a debounced save): token added, moved, HP changed or deleted; grid applied or forgotten; feet per square or grid color changed; map changed; and when a pan or zoom gesture ends.
-- [ ] **Images** (IndexedDB database `vttBoardImages`): the current map file under one key, and one entry per token name that is on the board. On each save, entries for tokens no longer on the board are removed, and the map entry is replaced when the map changes. This needs the picked `File` objects kept alongside the object URLs in `handleFolder` (small change to existing code).
-- [ ] **Restore on open:** read the state, rebuild object URLs from the stored images, and put the map and token names into the libraries so they appear in the dropdown and token menu until the folders are loaded; put tokens back with their images, restore the grid, view and settings. Loading the folders later adds to the libraries as it does today.
-- [ ] **If the stored map image is missing** (storage cleared by the browser): restore tokens and settings anyway and show a message "Map image missing: load your map folder and pick <name>"; picking that map then loads its grid by name (item A).
-- [ ] **New "Saves" tab** in the sidebar (tabs become Assets, Map, Saves, Help) with a NEW BOARD button (confirmation first; clears the autosave and stored images, tokens and map) and a line showing stored image size and last autosave time.
-- [ ] **Storage care:** all storage calls in try/catch (the app works without storage); after the first successful save, ask the browser for persistent storage (`navigator.storage.persist()`, best effort).
-- [ ] Unchanged: the dice roller and its history, map/token/calibration behavior, folder status lines.
-- [ ] **Files:** `script.js`, `index.html`, `styles.css`. Cache-bust: script.js?v=8→9, styles.css?v=8→9.
-
-Verification plan (targeted, about 2 to 3 minutes): with a test map and token folder, add tokens, move them, change HP, calibrate, zoom; reload; check the board is back (tokens, positions, HP, grid, zoom, map shown) without picking folders; changing the map replaces the stored map; removing a token drops its stored image; NEW BOARD clears everything after confirmation; missing map image shows the message and still restores tokens; storage disabled still works; the Saves tab shows size and time; zero JS errors. **Needs a real-device check:** that the board comes back after closing and reopening Chrome on the phone, and how much storage it uses.
+Build C next (A and B are done, see Build Logs 10 and 11). Nothing stores image libraries; only the current map, the tokens on the board, grid definitions and small state records are saved, all on the device.
 
 ### C. Named saves, and export / import file
 

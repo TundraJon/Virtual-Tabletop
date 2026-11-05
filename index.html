@@ -4,7 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Micro VTT</title>
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 
@@ -18,6 +18,7 @@
         <div class="tab-bar">
             <button class="tab-btn active" onclick="openTab(event, 'tab-assets')">Assets</button>
             <button class="tab-btn" onclick="openTab(event, 'tab-map')">Map</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab-saves')">Saves</button>
             <button class="tab-btn" onclick="openTab(event, 'tab-help')">Help</button>
         </div>
 
@@ -58,6 +59,15 @@
                 <input type="number" id="ftPerSq" value="5" onchange="grid.ftPerSq = this.value;">
                 <button class="action-btn" onclick="fitToScreen()">FIT TO SCREEN</button>
                 <div class="color-grid" id="swatchContainer"></div>
+            </div>
+        </div>
+
+        <div id="tab-saves" class="sidebar-content">
+            <div class="panel">
+                <h3>AUTOSAVE</h3>
+                <div id="autoInfo" class="count-display"></div>
+                <div id="autoNote" class="auto-note"></div>
+                <button class="action-btn" id="btnNewBoard" style="color:#ff8a7a;">NEW BOARD</button>
             </div>
         </div>
 
@@ -127,6 +137,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=9"></script>
 </body>
 </html>

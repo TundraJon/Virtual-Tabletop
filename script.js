@@ -6,7 +6,7 @@
         let calPoints = [null, null], currentMode = null, showPins = true;
         let isPinching = false, zoomCooldown = false, lastPinchDist = 0, lastPinchMid = {x:0, y:0}, touchStartPos = {x:0, y:0};
         let dragging = null, dragStartX = 0, dragStartY = 0, lastMove = null;
-        let gridColor = "0, 255, 204", menuTimer = null, curMapName = '';
+        let gridColor = "0, 255, 204", menuTimer = null, curMapName = '', mapFiles = {}, tokenFiles = {};
 
         function init() {
             // Check persistence
@@ -63,7 +63,7 @@
             const folderPath = files[0].webkitRelativePath;
             const folderName = folderPath.split('/')[0];
 
-            files.forEach(f => { lib[f.name.split('.')[0]] = URL.createObjectURL(f); });
+            files.forEach(f => { const k = f.name.split('.')[0]; lib[k] = URL.createObjectURL(f); (lib === mapLib ? mapFiles : tokenFiles)[k] = f; });
 
             if(type === 'map') {
                 const select = document.getElementById('mapSelect'); select.innerHTML = '<option>-- SELECT MAP --</option>';
@@ -1024,5 +1024,177 @@
             });
         })();
 
+        // ===== BOARD STORAGE: autosave of the board, with the current map and board tokens =====
+        (function () {
+            const BOARD_KEY = 'vttBoard', DB_NAME = 'vttBoardImages', STORE = 'images', MAX_TOKENS = 200;
+            const $ = (id) => document.getElementById(id);
+            const infoEl = $('autoInfo'), noteEl = $('autoNote');
+            let restoring = false, touching = false, lastJson = '', persistAsked = false, lastSaveAt = 0, imgBytes = 0, known = { w: 0, h: 0 };
+            let storedMap = null, storedTokens = new Set(), imgChain = Promise.resolve();
+            const fromStore = { maps: new Set(), tokens: new Set() }; // library names that exist only because they were restored from storage
+
+            // ---- the stored images (IndexedDB): the current map and the tokens on the board only ----
+            let dbp = null;
+            const openDb = () => dbp || (dbp = new Promise((res, rej) => { try { const r = indexedDB.open(DB_NAME, 1); r.onupgradeneeded = () => r.result.createObjectStore(STORE); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }));
+            const req = (mode, fn) => openDb().then(db => new Promise((res, rej) => { const tx = db.transaction(STORE, mode), r = fn(tx.objectStore(STORE)); tx.oncomplete = () => res(r && r.result); tx.onerror = tx.onabort = () => rej(tx.error); }));
+            const idbGet = (k) => req('readonly', s => s.get(k)), idbPut = (k, v) => req('readwrite', s => s.put(v, k)), idbDel = (k) => req('readwrite', s => s.delete(k));
+            const idbKeys = () => req('readonly', s => s.getAllKeys()), idbAll = () => req('readonly', s => s.getAll()), idbClear = () => req('readwrite', s => s.clear());
+
+            // ---- the board's state ----
+            function capture() {
+                return {
+                    v: 1,
+                    map: curMapName ? { name: curMapName, w: mapImg.naturalWidth || known.w, h: mapImg.naturalHeight || known.h } : null,
+                    grid: { x1: grid.x1, y1: grid.y1, x2: grid.x2, y2: grid.y2, size: grid.size, ftPerSq: Number(grid.ftPerSq) || 5 },
+                    cal: calPoints.map(c => (c ? { x: c.x, y: c.y } : null)),
+                    sq: parseInt($('sqCount').value, 10) || 25, gridColor: gridColor,
+                    view: { scale: scale, x: offset.x, y: offset.y },
+                    tokens: tokens.map(t => ({ id: t.id, x: t.x, y: t.y, baseName: t.baseName, instanceNum: t.instanceNum, hp: t.hp, maxHp: t.maxHp }))
+                };
+            }
+            // Turns anything (a stored board, a saved board, an imported file) into a safe state object, or null
+            function cleanState(o) {
+                if (!o || typeof o !== 'object' || o.v !== 1) return null;
+                const n = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+                const str = (v, max) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : null);
+                const g = o.grid || {}, vw = o.view || {};
+                const out = {
+                    v: 1, map: null,
+                    grid: { x1: n(g.x1, 0), y1: n(g.y1, 0), x2: n(g.x2, 0), y2: n(g.y2, 0), size: Math.max(0, n(g.size, 0)), ftPerSq: n(g.ftPerSq, 5) },
+                    cal: [0, 1].map(i => { const c = Array.isArray(o.cal) ? o.cal[i] : null; return c && Number.isFinite(c.x) && Number.isFinite(c.y) ? { x: c.x, y: c.y } : null; }),
+                    sq: Math.max(1, Math.round(n(o.sq, 25))),
+                    gridColor: typeof o.gridColor === 'string' && /^[0-9, ]{5,20}$/.test(o.gridColor) ? o.gridColor : '0, 255, 204',
+                    view: { scale: Math.min(100, Math.max(0.01, n(vw.scale, 1))), x: n(vw.x, 0), y: n(vw.y, 0) },
+                    tokens: []
+                };
+                if (o.map && str(o.map.name, 120)) out.map = { name: o.map.name, w: Math.max(0, Math.round(n(o.map.w, 0))), h: Math.max(0, Math.round(n(o.map.h, 0))) };
+                if (Array.isArray(o.tokens)) o.tokens.slice(0, MAX_TOKENS).forEach((t, i) => {
+                    if (!t || !str(t.baseName, 80)) return;
+                    const maxHp = Math.max(1, Math.round(n(t.maxHp, 20)));
+                    out.tokens.push({ id: str(t.id, 60) || ('tk_' + Date.now() + '_' + i), x: n(t.x, 0), y: n(t.y, 0), baseName: t.baseName, instanceNum: Math.max(1, Math.round(n(t.instanceNum, 1))), maxHp: maxHp, hp: Math.min(maxHp, Math.max(0, Math.round(n(t.hp, maxHp)))) });
+                });
+                return out;
+            }
+            function rebuildMapSelect(selected) {
+                const sel = $('mapSelect'); sel.innerHTML = '<option>-- SELECT MAP --</option>';
+                Object.keys(mapLib).sort().forEach(k => { const o = document.createElement('option'); o.value = k; o.innerText = k.toUpperCase(); sel.appendChild(o); });
+                if (selected) sel.value = selected;
+            }
+            const note = (t) => { noteEl.textContent = t || ''; };
+
+            // Puts a clean state on the board. src.mapBlob / src.tokenBlobs hold stored images; otherwise the loaded libraries are used.
+            function applyState(st, src) {
+                src = src || {};
+                note('');
+                tokens = st.tokens.map(t => {
+                    const img = new Image();
+                    let url = tokenLib[t.baseName];
+                    if (!url && src.tokenBlobs && src.tokenBlobs[t.baseName]) { url = URL.createObjectURL(src.tokenBlobs[t.baseName]); tokenLib[t.baseName] = url; fromStore.tokens.add(t.baseName); }
+                    if (url) img.src = url;
+                    return { id: t.id, x: t.x, y: t.y, img: img, baseName: t.baseName, instanceNum: t.instanceNum, hp: t.hp, maxHp: t.maxHp };
+                });
+                grid.x1 = st.grid.x1; grid.y1 = st.grid.y1; grid.x2 = st.grid.x2; grid.y2 = st.grid.y2; grid.size = st.grid.size; grid.ftPerSq = st.grid.ftPerSq;
+                calPoints = [st.cal[0] ? { x: st.cal[0].x, y: st.cal[0].y } : null, st.cal[1] ? { x: st.cal[1].x, y: st.cal[1].y } : null];
+                $('sqCount').value = st.sq; $('ftPerSq').value = st.grid.ftPerSq; gridColor = st.gridColor;
+                scale = st.view.scale; offset = { x: st.view.x, y: st.view.y };
+                showPins = !(grid.size > 0); currentMode = null;
+                $('sqDownDisplay').textContent = 'Squares Down: --'; updateUI();
+                known = { w: st.map ? st.map.w : 0, h: st.map ? st.map.h : 0 };
+                if (!st.map) { mapImg = new Image(); curMapName = ''; rebuildMapSelect(); return { map: 'none' }; }
+                const name = st.map.name; let url = null;
+                if (src.mapBlob) { url = URL.createObjectURL(src.mapBlob); if (!mapLib[name]) fromStore.maps.add(name); mapLib[name] = url; }
+                else if (mapLib[name]) url = mapLib[name];
+                curMapName = name;
+                if (url) {
+                    rebuildMapSelect(name);
+                    mapImg = new Image();
+                    mapImg.onload = () => { known = { w: mapImg.naturalWidth, h: mapImg.naturalHeight }; if (boardHooks.setMap) boardHooks.setMap(name, known.w, known.h); };
+                    mapImg.src = url;
+                    return { map: 'shown' };
+                }
+                mapImg = new Image(); rebuildMapSelect();
+                if (boardHooks.setMap) boardHooks.setMap(name, known.w, known.h);
+                note('Map image missing: load your map folder and pick "' + name + '".');
+                return { map: 'missing' };
+            }
+
+            // ---- saving ----
+            function syncImages() {
+                imgChain = imgChain.then(async () => {
+                    const st = capture(), names = new Set(st.tokens.map(t => t.baseName));
+                    if (st.map && st.map.name !== storedMap && mapFiles[st.map.name]) { await idbPut('map', mapFiles[st.map.name]); await idbPut('mapName', st.map.name); storedMap = st.map.name; }
+                    else if (!st.map && storedMap) { await idbDel('map'); await idbDel('mapName'); storedMap = null; }
+                    for (const nm of names) if (!storedTokens.has(nm) && tokenFiles[nm]) { await idbPut('token:' + nm, tokenFiles[nm]); storedTokens.add(nm); }
+                    for (const nm of Array.from(storedTokens)) if (!names.has(nm)) { await idbDel('token:' + nm); storedTokens.delete(nm); }
+                    imgBytes = (await idbAll()).reduce((a, v) => a + ((v && v.size) || 0), 0);
+                }).catch(() => {});
+                return imgChain;
+            }
+            function showInfo() {
+                const t = lastSaveAt ? new Date(lastSaveAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'not yet';
+                infoEl.textContent = 'Stored images: ' + (imgBytes < 1048576 ? Math.round(imgBytes / 1024) + ' KB' : (imgBytes / 1048576).toFixed(1) + ' MB') + ' (' + (storedMap ? 'map' : 'no map') + ' + ' + storedTokens.size + ' token' + (storedTokens.size === 1 ? '' : 's') + '). Last autosave: ' + t + '.';
+            }
+            function tick() { // runs twice a second; saves only when the board changed and no finger is on the map
+                if (restoring || touching || dragging || isPinching) return;
+                let json; try { json = JSON.stringify(capture()); } catch (e) { return; }
+                if (json === lastJson) return;
+                try { localStorage.setItem(BOARD_KEY, json); } catch (e) { note('Autosave is not available in this browser.'); lastJson = json; return; }
+                lastJson = json; lastSaveAt = Date.now();
+                try { localStorage.setItem(BOARD_KEY + 'At', String(lastSaveAt)); } catch (e) {}
+                if (!persistAsked && navigator.storage && navigator.storage.persist) { persistAsked = true; try { navigator.storage.persist().catch(() => {}); } catch (e) {} }
+                syncImages().then(showInfo);
+            }
+
+            // ---- restoring ----
+            async function restore() {
+                let raw = null; try { raw = localStorage.getItem(BOARD_KEY); } catch (e) {}
+                if (!raw) return;
+                let st = null; try { st = cleanState(JSON.parse(raw)); } catch (e) {}
+                if (!st) return;
+                restoring = true;
+                try { lastSaveAt = Number(localStorage.getItem(BOARD_KEY + 'At')) || 0; } catch (e) {}
+                try {
+                    const src = { mapBlob: null, tokenBlobs: {} };
+                    try {
+                        storedMap = (await idbGet('mapName')) || null; src.mapBlob = storedMap ? ((await idbGet('map')) || null) : null;
+                        for (const k of (await idbKeys())) if (String(k).startsWith('token:')) { src.tokenBlobs[String(k).slice(6)] = await idbGet(k); storedTokens.add(String(k).slice(6)); }
+                        if (!src.mapBlob) storedMap = null;
+                    } catch (e) {}
+                    applyState(st, src);
+                    lastJson = JSON.stringify(capture());
+                } finally { restoring = false; }
+                try { imgBytes = (await idbAll()).reduce((a, v) => a + ((v && v.size) || 0), 0); } catch (e) {}
+                showInfo();
+            }
+
+            // ---- new board ----
+            async function newBoard() {
+                if (!confirm('Start a new board? This clears the autosaved map, tokens and grid.')) return;
+                restoring = true;
+                tokens = []; grid.x1 = grid.y1 = grid.x2 = grid.y2 = 0; grid.size = 0; calPoints = [null, null]; showPins = true; currentMode = null;
+                mapImg = new Image(); curMapName = ''; known = { w: 0, h: 0 }; scale = 1; offset = { x: 0, y: 0 };
+                fromStore.maps.forEach(k => delete mapLib[k]); fromStore.tokens.forEach(k => delete tokenLib[k]); fromStore.maps.clear(); fromStore.tokens.clear();
+                rebuildMapSelect(); $('mapSelect').selectedIndex = 0;
+                $('sqDownDisplay').textContent = 'Squares Down: --'; $('gridMemStatus').textContent = ''; updateUI(); note('');
+                try { localStorage.removeItem(BOARD_KEY); localStorage.removeItem(BOARD_KEY + 'At'); } catch (e) {}
+                try { await idbClear(); } catch (e) {}
+                storedMap = null; storedTokens = new Set(); imgBytes = 0; lastJson = ''; lastSaveAt = 0;
+                restoring = false; showInfo(); note('New board started.');
+            }
+
+            // Picking a map clears the "map missing" note, and remembers its size
+            const prevLoaded = boardHooks.mapLoaded;
+            boardHooks.mapLoaded = (n) => { known = { w: mapImg.naturalWidth, h: mapImg.naturalHeight }; note(''); prevLoaded(n); };
+            boardHooks.captureState = capture; boardHooks.cleanState = cleanState; boardHooks.applyState = applyState; boardHooks.restoreAutosave = restore;
+            boardHooks.note = note;
+            canvas.addEventListener('touchstart', () => { touching = true; }, { passive: true });
+            canvas.addEventListener('touchend', (e) => { touching = e.touches.length > 0; });
+            canvas.addEventListener('touchcancel', () => { touching = false; });
+            $('btnNewBoard').addEventListener('click', newBoard);
+            setInterval(tick, 500);
+            showInfo();
+        })();
+
         window.onclick = (e) => { if(e.target.tagName !== 'BUTTON' && !e.target.classList.contains('menu-item')) menu.style.display = 'none'; };
         init();
+        if (window.boardHooks && boardHooks.restoreAutosave) boardHooks.restoreAutosave();
