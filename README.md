@@ -17,25 +17,29 @@ Split the single-file app into three files so each part can be worked on separat
 
 ## Build Queue
 
-### Dice roller
+### Dice roller (with dice notation)
 
 **Not yet authorized to build.**
 
-An animated dice roller that slides up from the bottom of the map screen. Offline, no libraries.
+An animated dice roller that slides up from the bottom of the map screen, with a dice-notation text box. Offline, no libraries.
 
-- [ ] **Dice:** d2, d4, d6, d8, d10, d12, d20, d30, d100, plus a custom "dX" (user enters sides, 2 to 1000). d10 is 1 to 10. d100 is a single die, 1 to 100.
+- [ ] **Dice:** d2, d4, d6, d8, d10, d12, d20, d30, d100 (also `d%`), plus a custom "dX" button (user enters sides, 2 to 1000). d10 is 1 to 10. d100 is a single die, 1 to 100.
 - [ ] **Entry point:** a dice button on the map screen (bottom-left, so it doesn't collide with the hamburger at top-right). Tapping it opens a tray that slides up from the bottom, with a close button. Tray sits above the map and below the sidebar.
-- [ ] **Pool:** tapping a die type adds it to the pool; the pool shows as chips (e.g. 2d6, 1d20) and tapping a chip removes one of that die. A Clear button empties it. Cap of 10 dice total.
-- [ ] **Modifier:** integer from -99 to +99, added to the total.
-- [ ] **Advantage / disadvantage:** ADV and DIS toggles, enabled only when the pool is exactly one d20. Rolls two d20, keeps the higher (ADV) or lower (DIS), and shows the discarded die dimmed. *(Scope detail chosen by Claude. Change before authorizing if wanted.)*
-- [ ] **Rolling:** a ROLL button. Each result is chosen first with `crypto.getRandomValues` (rejection sampling, so no modulo bias), then the animation lands on it, so the animation cannot skew a roll.
-- [ ] **Visuals:** dice drawn on canvas as polyhedron silhouettes (d2 as a coin, d4 triangle, d6 square, d8 diamond, d10/d100 kite-style, d12 pentagon, d20 triangle-in-hexagon, d30 and custom as a hexagon). They tumble and spin for about 1.2 seconds, then settle on the number. Total shown large. Natural 20 on a d20 gets a gold glow and particle burst; natural 1 gets a red flash. Animation is skipped (instant result) when the device prefers reduced motion.
+- [ ] **Notation box (source of truth):** a text box in the tray holding the roll expression, e.g. `3d6+1d10+2d12kl1+3`. Spaces ignored, capitals fine. Supports `NdS` (N optional), `d%`, `kh`/`kl` (keep highest/lowest), `dh`/`dl` (drop highest/lowest) with an optional number (default 1), `+ - * /`, parentheses, plain numbers (decimals allowed), where `*` and `/` bind tighter than `+` and `-`. Not supported: exploding dice, rerolls, success counting.
+- [ ] **Engine:** the dice-notation parser is written into `script.js`, adapted from the user's QSheet `qsheet-dice.js` (supplied for reference; not stored in the repo as its own file). Changes from that file: (1) every die is rolled directly with `crypto.getRandomValues` using rejection sampling (no modulo bias), replacing the seeded generator; (2) the result also returns the individual dice (sides, value, kept or dropped) so the animation does not have to parse text; (3) the unneeded helpers (`heldRoll`, `abilityScores`) are left out. Result still includes the text form with dropped dice in parentheses, e.g. `3d6[4,2,5] + 2d12kl1[(9),3] + 3 = 19`.
+- [ ] **Limits:** 20 dice in one term, 50 in one roll, 2 to 1000 sides. *(Numbers chosen by Claude between the user's "10 is too small" and "100 is too many." Change before authorizing if wanted.)*
+- [ ] **Errors:** bad input or a limit breach shows the engine's plain-English reason (and fix, for limits) under the box. Nothing is rolled and nothing is added to history.
+- [ ] **Quick-add buttons:** a row of die buttons. Tapping one edits the box, increasing that die's count in the expression (e.g. tap d6 twice gives `2d6`; a different die appends `+1d4`). Typing in the box edits the same expression. A Clear button empties it.
+- [ ] **Modifier:** a separate -/+ field, integer -99 to +99. At roll time the expression becomes `(box)+mod` or `(box)-mod`; zero adds nothing. The tray shows this full expression before rolling.
+- [ ] **Advantage / disadvantage:** ADV and DIS buttons, enabled only when the box holds exactly one d20 (plus nothing else). They roll `2d20kh1` (ADV) or `2d20kl1` (DIS) with the modifier, with the discarded die dimmed. Typing `2d20kh1` by hand does the same thing. *(Scope detail chosen by Claude. Change before authorizing if wanted.)*
+- [ ] **Rolling:** a ROLL button runs the expression through the engine. Each result is decided first, then the animation lands on it, so the animation cannot skew a roll.
+- [ ] **Visuals:** dice drawn on canvas as polyhedron silhouettes (d2 as a coin, d4 triangle, d6 square, d8 diamond, d10/d100 kite-style, d12 pentagon, d20 triangle-in-hexagon, d30 and any other side count as a hexagon). They tumble and spin for about 1.2 seconds, then settle on the number. Dropped dice are dimmed. Up to 12 dice are animated individually; beyond that the rest appear as small settled numbers with no tumble. Total shown large. A kept d20 showing 20 gets a gold glow and particle burst; a kept d20 showing 1 gets a red flash. Animation is skipped (instant result) when the device prefers reduced motion.
 - [ ] **No sound, no vibration.**
-- [ ] **History:** last 10 rolls (pool, modifier, individual dice, total, time) listed in the tray. Saved to `localStorage` so it survives a reload. A Clear History button.
+- [ ] **History:** last 10 rolls (expression, text form with every die, total, time) listed in the tray. Saved to `localStorage` so it survives a reload. A Clear History button.
 - [ ] **Files:** markup in `index.html`, styles in `styles.css`, logic in `script.js`. Cache-bust bumped for each file changed, logged before and after.
 - [ ] No changes to existing map, token or calibration behavior.
 
-Verification plan: Playwright for zero JS errors; open and close the tray; pool add, remove, clear and the 10-dice cap; modifier limits; ADV/DIS enable rules and keep-higher/lower math; custom dX bounds; RNG distribution check over thousands of rolls per die (all faces reachable, roughly uniform); history capped at 10 and persisted across reload; screenshots of each die and the 20/1 effects; re-run the Build Log 1 checks as a regression. **Needs a real-device check:** touch feel and animation smoothness on a phone.
+Verification plan: Playwright for zero JS errors; open and close the tray; the notation parser against a battery of good and bad expressions (precedence, parentheses, `kh/kl/dh/dl` including the keep/drop-count-too-large error, `d%`, `/0`, spaces and capitals, every limit and its message); quick-add buttons editing the box; modifier handling; ADV/DIS enable rules and keep-higher/lower math; custom dX bounds; RNG check over thousands of rolls per die (all faces reachable, roughly uniform, d2 and d30 included); history capped at 10 and persisted across reload; screenshots of each die shape, the dropped-dice dimming, and the 20/1 effects; re-run the Build Log 1 checks as a regression. **Needs a real-device check:** touch feel and animation smoothness on a phone.
 
 ## Build Planner
 
