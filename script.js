@@ -285,7 +285,7 @@
             const tray = el('diceTray'), fab = el('diceFab'), closeBtn = el('diceClose'), stage = el('diceStage');
             const cv = el('diceCanvas'), dctx = cv.getContext('2d'), totalEl = el('diceTotal'), textEl = el('diceText'), moreEl = el('diceMore');
             const input = el('diceExpr'), msgEl = el('diceMsg'), keysEl = el('diceKeys'), scrollEl = el('diceScroll'), kbBtn = el('diceKb'), rollBtn = el('diceRollBtn');
-            const advBtn = el('diceAdv'), disBtn = el('diceDis'), clearBtn = el('diceClear');
+            const advBtn = el('diceAdv'), disBtn = el('diceDis'), clearBtn = el('diceClear'), delBtn = el('diceDel');
             const modMinus = el('diceModMinus'), modPlus = el('diceModPlus'), modInput = el('diceMod');
             const previewEl = el('dicePreview'), histEl = el('diceHist'), histClear = el('diceHistClear');
 
@@ -850,14 +850,11 @@
 
             // ---- On-screen keypad: every key inserts exactly what it says, at the cursor ----
             const KEY_ROWS = [
-                { cols: 5, keys: [['d2'], ['d4'], ['d6'], ['d8'], ['d10']] },
-                { cols: 5, keys: [['d12'], ['d20'], ['d30'], ['d100'], ['d']] },
-                { cols: 5, keys: [['1'], ['2'], ['3'], ['4'], ['5']] },
-                { cols: 5, keys: [['6'], ['7'], ['8'], ['9'], ['0']] },
-                { cols: 6, keys: [['+'], ['\u2212', '-'], ['\u00d7', '*'], ['\u00f7', '/'], ['('], [')']] },
-                { cols: 7, keys: [[','], ['!'], ['B', 'b'], ['P', 'p'], ['T', 't'], ['MIN', 'min'], ['MAX', 'max']] },
-                { cols: 5, keys: [['KH', 'kh'], ['KL', 'kl'], ['DH', 'dh'], ['DL', 'dl'], ['DEL']] },
-                { cols: 1, keys: [['4D6KH3', '4d6kh3']], quick: true }
+                { keys: [['d'], ['d2'], ['d4'], ['d6'], ['d8'], ['d10'], ['d12'], ['d20'], ['d100']] },
+                { keys: [['1'], ['2'], ['3'], ['4'], ['5'], ['6'], ['7'], ['8'], ['9'], ['0']] },
+                { keys: [['+'], ['\u2212', '-'], ['*'], ['/'], ['('], [')'], [','], ['!']] },
+                { keys: [['B', 'b'], ['P', 'p'], ['T', 't'], ['MIN', 'min'], ['MAX', 'max'], ['KH', 'kh'], ['KL', 'kl'], ['DH', 'dh'], ['DL', 'dl']] },
+                { keys: [['4D6KH3', '4d6kh3']], quick: true }
             ];
             const selStart = () => (typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length);
             const selEnd = () => (typeof input.selectionEnd === 'number' ? input.selectionEnd : selStart());
@@ -872,20 +869,39 @@
                 if (s !== e) { input.value = v.slice(0, s) + v.slice(e); setCaret(s); }
                 else if (s > 0) { input.value = v.slice(0, s - 1) + v.slice(s); setCaret(s - 1); }
             }
+            // A die key (d2 to d100). Tapping it again raises that die's count; a different die gets a + in front.
+            function dieKey(S) {
+                const v = input.value, s = selStart(), e = selEnd(), tag = 'd' + S;
+                if (s !== e) { insertText(tag); return; }                                   // replacing a selection
+                const before = v.slice(0, s), after = v.slice(s);
+                if (/(^|[+\-*/(,{])\d+$/.test(before)) { insertText(tag); return; }          // a count is being typed: 2 then d6 gives 2d6
+                const m = new RegExp('(^|[^0-9a-z)}])(\\d*)d' + S + '(?![0-9a-z!%])', 'i').exec(v); // a plain term of this die already in the box
+                if (m) {
+                    const n = m[2] === '' ? 1 : parseInt(m[2], 10), idx = m.index + m[1].length;
+                    const nv = v.slice(0, idx) + (n + 1) + v.slice(idx + m[2].length);
+                    input.value = nv;
+                    setCaret(s === v.length ? nv.length : (idx + m[2].length <= s ? s + (nv.length - v.length) : s));
+                    return;
+                }
+                const prev = before.slice(-1), next = after.charAt(0);                      // otherwise add a new term, with a + where one is needed
+                insertText((before === '' || /[+\-*/(,{]/.test(prev) ? '' : '+') + '1' + tag + (next !== '' && /[0-9a-z(]/i.test(next) ? '+' : ''));
+            }
             KEY_ROWS.forEach(row => {
-                const r = document.createElement('div'); r.className = 'krow'; r.style.setProperty('--cols', row.cols);
+                const r = document.createElement('div'); r.className = 'krow'; r.style.setProperty('--cols', row.keys.length);
                 row.keys.forEach(k => {
                     const label = k[0], b = document.createElement('button');
                     b.type = 'button'; b.className = 'dkey'; b.textContent = label;
+                    if (label.length >= 3) b.classList.add('long');
                     const dm = /^d(\d+)$/.exec(label);
-                    if (dm) { b.classList.add('dice'); b.style.setProperty('--c', colorFor(Number(dm[1]))); }
-                    if (row.quick) b.classList.add('quick');
-                    if (label === 'DEL') { b.classList.add('del'); b.setAttribute('aria-label', 'Delete'); b.addEventListener('click', backspace); }
+                    if (dm) { b.classList.add('dice'); b.style.setProperty('--c', colorFor(Number(dm[1]))); b.addEventListener('click', () => dieKey(Number(dm[1]))); }
                     else b.addEventListener('click', () => insertText(k.length > 1 ? k[1] : label));
+                    if (row.quick) b.classList.add('quick');
                     r.appendChild(b);
                 });
                 keysEl.appendChild(r);
             });
+            delBtn.addEventListener('click', backspace);
+            delBtn.addEventListener('mousedown', (e) => e.preventDefault());
             keysEl.addEventListener('mousedown', (e) => e.preventDefault()); // keep the cursor in the box when a key is pressed
             kbBtn.addEventListener('click', () => { // show or hide the phone keyboard
                 const on = input.getAttribute('inputmode') === 'none';

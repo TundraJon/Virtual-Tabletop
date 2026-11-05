@@ -122,28 +122,26 @@ Replaced the die-button grid with a calculator-style keypad so expressions can b
 - **Needs a real-device check:** that `inputmode="none"` hides the keyboard on Android Chrome, how tapping in the box places the cursor, and key tap size and feel.
 - **Known tradeoff:** the keypad is tall, so on a phone you scroll to reach the lower keys and scroll back up to watch a roll (ROLL does this automatically).
 
-## Build Queue
-
+## Build Log 7 (completed)
 ### Keypad tightening: fewer rows, smart die keys
 
-**Not yet authorized to build.**
+Tightened the Expression Builder keypad (Build Log 6) and brought back "tap a die repeatedly". The notation engine is not touched.
 
-Tightens the Expression Builder keypad (Build Log 6) and brings back the "tap a die repeatedly" behavior. The notation engine is not touched.
+- [x] Key rows in `script.js` (`KEY_ROWS`, 37 keys): (1) `d d2 d4 d6 d8 d10 d12 d20 d100`; (2) `1` to `0`; (3) `+ − * / ( ) , !`; (4) `B P T MIN MAX KH KL DH DL`; (5) the `4D6KH3` quick key. The d30 key and the KH/KL/DH/DL/DEL row are gone (keypad 8 rows → 5). The multiply and divide keys now read `*` and `/`.
+- [x] DEL moved into the modifier row, right of CLEAR (`#diceDel` in `index.html`, still `backspace()`); modifier buttons narrowed to 36px and the field to 48px; ADV/DIS/CLEAR/DEL use 11px text and at least 40px width, so the row stays on one line.
+- [x] Smart die keys (`dieKey`): with a selection, replace it with `dN`; if the text before the cursor ends in a bare number (`2`, `+3`), insert `dN` (calculator style); else if the box holds a plain term of that die (not followed by `kh`, `b`, `t`, `!`, `min` etc, and not the `d2` in `)d2`) raise its count by one and keep the cursor (at the end if it was at the end); else insert `1dN` at the cursor with a `+` before it when needed and after it when the next character is a digit, letter or `(`. `d` inserts a plain `d`.
+- [x] Sizing in `styles.css`: `--key-gap` 6px → 3px, new `--key-pad: 4px` (keypad side margin), `.dkey.long` (labels of 3+ characters) at 12px, key height still 40px. All keys at least 32 x 32 px.
+- [x] Cache-bust bumped: styles.css?v=4→5, script.js?v=5→6.
 
-- [ ] **New key rows:** (1) `d` `d2` `d4` `d6` `d8` `d10` `d12` `d20` `d100` (9 keys; the `d30` key is removed, d30 is typed with `d`, `3`, `0`); (2) `1 2 3 4 5 6 7 8 9 0`; (3) `+ − * / ( ) , !` (8 keys); (4) `B P T MIN MAX KH KL DH DL` (9 keys); (5) the full-width `4D6KH3` quick key. The old KH/KL/DH/DL/DEL row is gone. Keypad goes from 8 rows to 5.
-- [ ] **Operator labels:** the multiply and divide keys are labeled `*` and `/`, the exact characters they insert (replacing `×` and `÷`). The minus key keeps its `−` label and inserts `-`.
-- [ ] **DEL moves** into the modifier row, to the right of CLEAR: `[−] [0] [+] ADV DIS CLEAR DEL`. To make it fit, the modifier buttons shrink (about 36px wide, field about 48px) and ADV/DIS/CLEAR/DEL use a smaller font (about 11 to 12px), at least 40px wide. DEL keeps its behavior (deletes the selection or the character before the cursor) and its red label.
-- [ ] **Smart die keys (d2 to d100), as before:** tapping a die key repeatedly raises the count, and tapping a different die adds a plus. `d8` three times gives `3d8`; `d6` twice then `d8` three times gives `2d6+3d8`. Rules, in order:
-  1. If keys are replacing a selection, the selected text is replaced by `dN` (no smart behavior).
-  2. If the text before the cursor ends in a bare number that is not part of a term (for example `2` at the start, or `+3`), the key is calculator-style: it inserts `dN` after it (`2`, `d6` gives `2d6`).
-  3. Otherwise, if the box already holds a plain term of the same die (such as `d6`, `3d6` or `1d6`, not followed by a modifier like `kh`, `b`, `t`, `!` or `min`, and not the `d1` in `)d1`), its count goes up by one (`d6` becomes `2d6`) and the cursor stays where it was (at the end, if it was at the end).
-  4. Otherwise a new term `1dN` is inserted at the cursor, with a `+` added before it when the text before the cursor does not end in an operator, `(`, `,` or start of text, and a `+` after it when the text after the cursor starts with a digit, letter or `(`.
-- [ ] **`d` key:** inserts a plain `d` at the cursor (calculator-style), so `1`, `d`, `7` gives `1d7`.
-- [ ] **Key size:** every key stays at least 32 x 32 px at 360px and 412px wide, now with 10 keys across. To get there, the keypad's side padding drops to about 4px and the gap to about 3px (set through the existing `--key-gap` and a new `--key-pad` custom property), so keys are about 32px wide at 360px and about 35px at 412px. Key height stays 40px. Rows with 8 or 9 keys are wider. Long labels (`MIN`, `MAX`, `d100`) use about 12px text.
-- [ ] **Unchanged:** the engine, ADV/DIS, the pinned box and ROLL, the keyboard toggle, the delayed error, the caption, history, and the 32 x 32 minimum.
-- [ ] **Files:** `index.html` (move DEL), `styles.css`, `script.js` (key table and the die-key logic). Cache-bust: styles.css?v=4→5, script.js?v=5→6.
+**Verification:** Playwright (Chromium), 38 checks, all pass, zero JS errors, 13 seconds. (Two checks first failed because my test expected the wrong cursor positions; the app was right, and the expectations were corrected.)
+- Sizes at 360px and 412px wide: all 37 keys at least 32 x 32 (narrowest about 32px at 360px); five rows with exactly the requested keys; modifier row on one line with every control at least 32 x 32; DEL to the right of CLEAR.
+- Die keys: `d8` x3 gives `3d8` with the cursor at the end; `d6` x2 then `d8` x3 gives `2d6+3d8`; `d6,d8,d6,d8` gives `2d6+2d8`; `2`,`d6` gives `2d6`; empty then `d8` gives `1d8`; `4d6kh3`, `d100b`, a group and `)d2` followed by a die key add a new term instead of changing the old one; `2d6+3` then `d8` gives `2d6+3d8`; selection replaced; inserts at the start and middle put plus signs in the right places with the cursor after the new text; incrementing keeps or shifts the cursor correctly (`9d6` → `10d6` shifts it by one); `d`,`3`,`0` gives `d30`; `*`, `/`, minus and the quick key insert the right characters.
+- DEL removes a character, a selection, and does nothing on an empty box. A tap-built `2d6+3d8` rolls to the expected total with forced dice (9), and ADV converts its d6 term. No dialogs, no d30 key. Screenshots reviewed at 360x640 and 412x700.
+- **Needs a real-device check:** key size and feel at 10 across, mainly the digit row on a 360px-wide phone.
 
-Verification plan (targeted, about 1 to 2 minutes): all keys at least 32 x 32 at 360px and 412px wide, with the new row counts and the modifier row not wrapping; die-key sequences give the exact strings (`d8` x3 gives `3d8`; `d6` x2 then `d8` x3 gives `2d6+3d8`; `2`, `d6` gives `2d6`; empty box then `d8` gives `1d8`; `4d6kh3` then `d6` gives `4d6kh3+1d6`; `d100b` then `d100` gives `d100b+1d100`; `(d8,d6)kh` then `d12` gives `(d8,d6)kh+1d12`; `)d2` shorthand is not treated as a die; selection replaced; insert in the middle adds the right plus signs; the cursor stays at the end when building left to right); the new labels insert `*` and `/`; DEL beside CLEAR still deletes; `d`, `3`, `0` gives `d30`; zero JS errors; screenshots at 360x640 and 412x700. **Needs a real-device check:** key size and feel at 10 across on the phone.
+## Build Queue
+
+_Empty — nothing queued right now._
 
 ## Build Planner
 
