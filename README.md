@@ -124,7 +124,26 @@ Replaced the die-button grid with a calculator-style keypad so expressions can b
 
 ## Build Queue
 
-_Empty — nothing queued right now._
+### Keypad tightening: fewer rows, smart die keys
+
+**Not yet authorized to build.**
+
+Tightens the Expression Builder keypad (Build Log 6) and brings back the "tap a die repeatedly" behavior. The notation engine is not touched.
+
+- [ ] **New key rows:** (1) `d` `d2` `d4` `d6` `d8` `d10` `d12` `d20` `d100` (9 keys; the `d30` key is removed, d30 is typed with `d`, `3`, `0`); (2) `1 2 3 4 5 6 7 8 9 0`; (3) `+ − * / ( ) , !` (8 keys); (4) `B P T MIN MAX KH KL DH DL` (9 keys); (5) the full-width `4D6KH3` quick key. The old KH/KL/DH/DL/DEL row is gone. Keypad goes from 8 rows to 5.
+- [ ] **Operator labels:** the multiply and divide keys are labeled `*` and `/`, the exact characters they insert (replacing `×` and `÷`). The minus key keeps its `−` label and inserts `-`.
+- [ ] **DEL moves** into the modifier row, to the right of CLEAR: `[−] [0] [+] ADV DIS CLEAR DEL`. To make it fit, the modifier buttons shrink (about 36px wide, field about 48px) and ADV/DIS/CLEAR/DEL use a smaller font (about 11 to 12px), at least 40px wide. DEL keeps its behavior (deletes the selection or the character before the cursor) and its red label.
+- [ ] **Smart die keys (d2 to d100), as before:** tapping a die key repeatedly raises the count, and tapping a different die adds a plus. `d8` three times gives `3d8`; `d6` twice then `d8` three times gives `2d6+3d8`. Rules, in order:
+  1. If keys are replacing a selection, the selected text is replaced by `dN` (no smart behavior).
+  2. If the text before the cursor ends in a bare number that is not part of a term (for example `2` at the start, or `+3`), the key is calculator-style: it inserts `dN` after it (`2`, `d6` gives `2d6`).
+  3. Otherwise, if the box already holds a plain term of the same die (such as `d6`, `3d6` or `1d6`, not followed by a modifier like `kh`, `b`, `t`, `!` or `min`, and not the `d1` in `)d1`), its count goes up by one (`d6` becomes `2d6`) and the cursor stays where it was (at the end, if it was at the end).
+  4. Otherwise a new term `1dN` is inserted at the cursor, with a `+` added before it when the text before the cursor does not end in an operator, `(`, `,` or start of text, and a `+` after it when the text after the cursor starts with a digit, letter or `(`.
+- [ ] **`d` key:** inserts a plain `d` at the cursor (calculator-style), so `1`, `d`, `7` gives `1d7`.
+- [ ] **Key size:** every key stays at least 32 x 32 px at 360px and 412px wide, now with 10 keys across. To get there, the keypad's side padding drops to about 4px and the gap to about 3px (set through the existing `--key-gap` and a new `--key-pad` custom property), so keys are about 32px wide at 360px and about 35px at 412px. Key height stays 40px. Rows with 8 or 9 keys are wider. Long labels (`MIN`, `MAX`, `d100`) use about 12px text.
+- [ ] **Unchanged:** the engine, ADV/DIS, the pinned box and ROLL, the keyboard toggle, the delayed error, the caption, history, and the 32 x 32 minimum.
+- [ ] **Files:** `index.html` (move DEL), `styles.css`, `script.js` (key table and the die-key logic). Cache-bust: styles.css?v=4→5, script.js?v=5→6.
+
+Verification plan (targeted, about 1 to 2 minutes): all keys at least 32 x 32 at 360px and 412px wide, with the new row counts and the modifier row not wrapping; die-key sequences give the exact strings (`d8` x3 gives `3d8`; `d6` x2 then `d8` x3 gives `2d6+3d8`; `2`, `d6` gives `2d6`; empty box then `d8` gives `1d8`; `4d6kh3` then `d6` gives `4d6kh3+1d6`; `d100b` then `d100` gives `d100b+1d100`; `(d8,d6)kh` then `d12` gives `(d8,d6)kh+1d12`; `)d2` shorthand is not treated as a die; selection replaced; insert in the middle adds the right plus signs; the cursor stays at the end when building left to right); the new labels insert `*` and `/`; DEL beside CLEAR still deletes; `d`, `3`, `0` gives `d30`; zero JS errors; screenshots at 360x640 and 412x700. **Needs a real-device check:** key size and feel at 10 across on the phone.
 
 ## Build Planner
 
@@ -161,6 +180,10 @@ All items below are ideas only. None are designed, queued or authorized to build
 - **Rerolls and target pools:** `r` / `ro` (reroll once), `>X` and `<X` (count successes instead of summing), `fX` (failures subtract). These change what a roll means (a success count, not a total), so they need their own design. Open questions: how a success count is displayed, and the exact reroll syntax (`r1`, `r<=2`).
 - **Game presets:** one-tap buttons for common system rolls (Lancer Accuracy, Call of Cthulhu bonus/penalty, Savage Worlds trait + Wild Die, 4d6kh3 stat roll beyond the keypad quick button). Open questions: where they live (keypad, a menu, or user-defined), and whether users can save their own.
 - **Success checks:** compare a roll to a skill or target (CoC hard/extreme success and fumbles, Savage Worlds target 4 and raises) and show the outcome. Open question: where the skill or target number is entered.
+
+### Keypad ideas
+
+- **Long-press dual-purpose keys:** hold a key to get a second function, like the symbols on a phone keyboard (the user's Android keyboard shows small corner hints). Would let the keypad stay small while offering more keys. Open questions: which keys get a second function and what it is (for example a die key's long-press giving `d6!`, or a digit giving a symbol); how to show the hint (a small corner label); how long a press counts; and how it works with the 32px key minimum.
 
 ### Requested by Jon
 
