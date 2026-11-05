@@ -82,7 +82,6 @@
         .dbtn:disabled { opacity: 0.3; cursor: default; }
         .dbtn-wide { flex: 1; min-width: 40px; padding: 10px 2px; font-size: 11px; }
         #diceDel { color: #ff8a7a; }
-        #dicePreview { min-height: 16px; margin: 0 2px 4px 2px; font-size: 11px; color: #888; font-family: monospace; word-break: break-all; }
         #diceRollBtn { width: 100%; padding: 16px; background: linear-gradient(#00ffcc, #00c9a0); color: #04201a; font-weight: 900; font-size: 18px; letter-spacing: 5px; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 0 18px rgba(0,255,204,0.45); font-family: inherit; }
         #diceRollBtn:disabled { opacity: 0.3; box-shadow: none; cursor: default; }
         .dice-hist-head { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }

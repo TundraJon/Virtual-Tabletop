@@ -287,7 +287,7 @@
             const input = el('diceExpr'), msgEl = el('diceMsg'), keysEl = el('diceKeys'), scrollEl = el('diceScroll'), kbBtn = el('diceKb'), rollBtn = el('diceRollBtn');
             const advBtn = el('diceAdv'), disBtn = el('diceDis'), clearBtn = el('diceClear'), delBtn = el('diceDel');
             const modMinus = el('diceModMinus'), modPlus = el('diceModPlus'), modInput = el('diceMod');
-            const previewEl = el('dicePreview'), histEl = el('diceHist'), histClear = el('diceHistClear');
+            const histEl = el('diceHist'), histClear = el('diceHistClear');
 
             // ---- Engine: dice notation (adapted from QSheet's parser; every die uses crypto randomness) ----
             class DiceError extends Error {
@@ -768,9 +768,24 @@
             }
 
             // ---- Controls ----
-            function getMod() { const v = parseInt(modInput.value, 10); return isNaN(v) ? 0 : Math.max(-99, Math.min(99, v)); }
-            function setMod(v) { modInput.value = Math.max(-99, Math.min(99, v)); refresh(); }
-            const fullExpr = (base) => { const m = getMod(); return m ? base + (m < 0 ? '-' : '+') + Math.abs(m) : base; };
+            // ---- The final modifier is the box's trailing +N or -N ----
+            const OPERATOR_END = /[+\-*/(,{]$/;
+            function trailingMod(v) { // a final +N or -N, after something that is not an operator
+                const m = /([+-])(\d+)$/.exec(v);
+                if (!m) return null;
+                const before = v.slice(0, m.index);
+                if (before === '' || OPERATOR_END.test(before)) return null;
+                return { start: m.index, value: (m[1] === '-' ? -1 : 1) * Number(m[2]) };
+            }
+            const modOf = (v) => { const t = trailingMod(v); return t ? t.value : 0; };
+            function setBox(v, pos) { input.value = v; input.setSelectionRange(pos, pos); refresh(); }
+            function applyMod(n) { // set the box's modifier to n (0 removes it); false if the box cannot take one
+                const v = input.value, t = trailingMod(v), base = t ? v.slice(0, t.start) : v;
+                if (base === '' || OPERATOR_END.test(base)) return false;
+                const nv = base + (n === 0 ? '' : (n < 0 ? '-' : '+') + Math.abs(n));
+                setBox(nv, selStart() === v.length ? nv.length : Math.min(selStart(), nv.length));
+                return true;
+            }
 
             // ---- Dice term at the cursor, and advantage / disadvantage on it ----
             const caret = () => (typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length);
@@ -797,7 +812,7 @@
                 const hit = cands.filter(c => pos >= c.start && pos <= c.end).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
                 return hit ? { start: hit.start, end: hit.end, text: str.slice(hit.start, hit.end) } : null;
             }
-            const isSingleDie = (c) => /^1?d(\d+|%)$/.test(c);
+            const LONE_DIE = /^1?d(\d+|%)([+-]\d+)?$/; // one die, with an optional trailing modifier
             // 1dN becomes 2dNkh1 (or kl1); any other term T becomes (T, T)kh1 (or kl1)
             function advText(term, mode) {
                 const m = /^1?d(\d+|%)$/.exec(term);
@@ -805,7 +820,8 @@
             }
             function advDis(mode) {
                 const compact = input.value.toLowerCase().replace(/\s+/g, '');
-                if (!rollBtn.disabled && isSingleDie(compact)) { doRoll(advText(compact, mode)); return; } // one die alone: roll it now, box unchanged
+                const lone = LONE_DIE.exec(compact);
+                if (!rollBtn.disabled && lone) { doRoll('2d' + lone[1] + mode + '1' + (lone[2] || '')); return; } // one die alone: roll it now, box unchanged
                 const t = termAt(input.value, caret());
                 if (!t) return;
                 const rep = advText(t.text.toLowerCase().replace(/\s+/g, ''), mode);
@@ -829,9 +845,12 @@
                 let ok = false, err = '';
                 if (base) { try { rollDice(base, true); ok = true; } catch (e) { err = niceError(e); } }
                 setMsg(err);
-                previewEl.textContent = ok ? 'Rolls: ' + fullExpr(base) : '';
                 rollBtn.disabled = !ok;
-                const canAdv = (ok && isSingleDie(base.toLowerCase().replace(/\s+/g, ''))) || !!termAt(input.value, caret());
+                const canAdv = (ok && LONE_DIE.test(base.toLowerCase().replace(/\s+/g, ''))) || !!termAt(input.value, caret());
+                const tm = trailingMod(input.value), modBase = tm ? input.value.slice(0, tm.start) : input.value;
+                const canMod = modBase !== '' && !OPERATOR_END.test(modBase);
+                modMinus.disabled = !canMod; modPlus.disabled = !canMod; modInput.disabled = !canMod;
+                if (document.activeElement !== modInput) modInput.value = String(canMod ? modOf(input.value) : 0);
                 advBtn.disabled = !canAdv; disBtn.disabled = !canAdv;
                 clearBtn.disabled = !input.value.length;
             }
@@ -840,7 +859,7 @@
                 base = (base || '').trim();
                 if (!base) return;
                 let res;
-                const expr = fullExpr(base);
+                const expr = base;
                 try { res = rollDice(expr); } catch (e) { msgEl.textContent = niceError(e); return; }
                 const hist = loadHist(); hist.unshift({ expr: expr, text: res.text, total: res.total, time: Date.now() });
                 saveHist(hist.slice(0, HIST_MAX)); renderHist();
@@ -869,22 +888,39 @@
                 if (s !== e) { input.value = v.slice(0, s) + v.slice(e); setCaret(s); }
                 else if (s > 0) { input.value = v.slice(0, s - 1) + v.slice(s); setCaret(s - 1); }
             }
+            // Memory for the digit keys: a mark is (box text, cursor) right after a tap, and only counts while both are unchanged.
+            let afterDie = null, typingRun = null;
+            const isMark = (m) => !!m && m.value === input.value && selStart() === selEnd() && selStart() === m.pos;
+            const markDie = () => { afterDie = { value: input.value, pos: selStart() }; typingRun = null; };
+            function digitKey(d) {
+                const v = input.value, s = selStart();
+                const plus = isMark(afterDie) && s > 0 && !OPERATOR_END.test(v.charAt(s - 1)); // a digit right after a die key starts a new term
+                insertText(plus ? '+' + d : d);
+                typingRun = { value: input.value, pos: selStart() }; afterDie = null;
+            }
             // A die key (d2 to d100). Tapping it again raises that die's count; a different die gets a + in front.
             function dieKey(S) {
                 const v = input.value, s = selStart(), e = selEnd(), tag = 'd' + S;
-                if (s !== e) { insertText(tag); return; }                                   // replacing a selection
+                if (s !== e) { insertText(tag); markDie(); return; }                          // replacing a selection
                 const before = v.slice(0, s), after = v.slice(s);
-                if (/(^|[+\-*/(,{])\d+$/.test(before)) { insertText(tag); return; }          // a count is being typed: 2 then d6 gives 2d6
+                if (isMark(typingRun) && /(^|[+\-*/(,{])\d+$/.test(before)) { insertText(tag); markDie(); return; } // a count was just typed: 2 then d6 gives 2d6
                 const m = new RegExp('(^|[^0-9a-z)}])(\\d*)d' + S + '(?![0-9a-z!%])', 'i').exec(v); // a plain term of this die already in the box
                 if (m) {
                     const n = m[2] === '' ? 1 : parseInt(m[2], 10), idx = m.index + m[1].length;
                     const nv = v.slice(0, idx) + (n + 1) + v.slice(idx + m[2].length);
                     input.value = nv;
                     setCaret(s === v.length ? nv.length : (idx + m[2].length <= s ? s + (nv.length - v.length) : s));
-                    return;
+                    markDie(); return;
                 }
-                const prev = before.slice(-1), next = after.charAt(0);                      // otherwise add a new term, with a + where one is needed
-                insertText((before === '' || /[+\-*/(,{]/.test(prev) ? '' : '+') + '1' + tag + (next !== '' && /[0-9a-z(]/i.test(next) ? '+' : ''));
+                const t = trailingMod(v);
+                if (t && s === v.length) {                                                       // a modifier is set: build the new term before it
+                    const head = v.slice(0, t.start), term = (OPERATOR_END.test(head) ? '' : '+') + '1' + tag;
+                    input.value = head + term + v.slice(t.start);
+                    setCaret(head.length + term.length); markDie(); return;
+                }
+                const prev = before.slice(-1), next = after.charAt(0);                          // otherwise add a new term, with a + where one is needed
+                insertText((before === '' || OPERATOR_END.test(prev) ? '' : '+') + '1' + tag + (next !== '' && /[0-9a-z(]/i.test(next) ? '+' : ''));
+                markDie();
             }
             KEY_ROWS.forEach(row => {
                 const r = document.createElement('div'); r.className = 'krow'; r.style.setProperty('--cols', row.keys.length);
@@ -894,6 +930,8 @@
                     if (label.length >= 3) b.classList.add('long');
                     const dm = /^d(\d+)$/.exec(label);
                     if (dm) { b.classList.add('dice'); b.style.setProperty('--c', colorFor(Number(dm[1]))); b.addEventListener('click', () => dieKey(Number(dm[1]))); }
+                    else if (/^[0-9]$/.test(label)) b.addEventListener('click', () => digitKey(label));
+                    else if (row.quick) b.addEventListener('click', () => { insertText(k[1]); markDie(); });
                     else b.addEventListener('click', () => insertText(k.length > 1 ? k[1] : label));
                     if (row.quick) b.classList.add('quick');
                     r.appendChild(b);
@@ -927,10 +965,10 @@
             advBtn.addEventListener('click', () => advDis('kh'));
             disBtn.addEventListener('click', () => advDis('kl'));
             clearBtn.addEventListener('click', () => { input.value = ''; refresh(); });
-            modMinus.addEventListener('click', () => setMod(getMod() - 1));
-            modPlus.addEventListener('click', () => setMod(getMod() + 1));
-            modInput.addEventListener('input', refresh);
-            modInput.addEventListener('change', () => setMod(getMod()));
+            modMinus.addEventListener('click', () => { const c = modOf(input.value); if (c > -99) applyMod(c - 1); });
+            modPlus.addEventListener('click', () => { const c = modOf(input.value); if (c < 99) applyMod(c + 1); });
+            modInput.addEventListener('input', () => { const n = parseInt(modInput.value, 10); if (!isNaN(n)) applyMod(Math.max(-99, Math.min(99, n))); });
+            modInput.addEventListener('change', () => { modInput.value = String(modOf(input.value)); });
             histClear.addEventListener('click', () => { saveHist([]); renderHist(); });
             window.addEventListener('resize', redraw);
 

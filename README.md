@@ -139,35 +139,31 @@ Tightened the Expression Builder keypad (Build Log 6) and brought back "tap a di
 - DEL removes a character, a selection, and does nothing on an empty box. A tap-built `2d6+3d8` rolls to the expected total with forced dice (9), and ADV converts its d6 term. No dialogs, no d30 key. Screenshots reviewed at 360x640 and 412x700.
 - **Needs a real-device check:** key size and feel at 10 across, mainly the digit row on a 360px-wide phone.
 
-## Build Queue
-
+## Build Log 8 (completed)
 ### Digits after die keys start a new term; the modifier lives in the notation box
 
-**Not yet authorized to build.**
+Fixed `4`, `d2`, `2`, `d8`, `1`, `2`, `d12` giving `4d22+1d812+1d12` (it now gives `4d2+2d8+12d12`), and moved the final modifier into the notation box.
 
-Two related keypad changes in `script.js` (plus a small markup/CSS cleanup). The notation engine is not touched.
+- [x] Digit memory in `script.js`: `afterDie` and `typingRun` marks (box text plus cursor, valid only while both are unchanged), `isMark`, `markDie`, `digitKey`. A digit tapped right after a die key or the `4D6KH3` quick key gets a `+` in front (unless the cursor is at the start or after an operator, `(`, `,` or `{`); the next digit just continues the number. Any other tap, edit or cursor move forgets the mark. The `d` key does not set it, so `d`,`3`,`0` still gives `d30`.
+- [x] Modifier = the box's trailing `+N` or `-N` (`trailingMod`, `modOf`, `applyMod`, `setBox`); nothing before the sign, or an operator/`(`/`,`/`{` before it, means no modifier (`2*-3`). The -/+ buttons and the number field read and edit it in the box (add `+1`/`-1`, change, remove at 0 so no `+0` is left). Typing in the field is clamped to -99..+99; a hand-typed value beyond that (`+150`) is left alone and shown, the button that would push further does nothing and the other lowers it by 1. The old hidden modifier (`getMod`, `setMod`, `fullExpr`) is removed; ROLL rolls the box text and history shows it.
+- [x] CLEAR empties the box, so the modifier resets to 0 (the field follows the box).
+- [x] The -/+ buttons and the field are disabled while the box is empty or ends in an operator, `(`, `,` or `{`, since there is nothing to attach a modifier to (added during the build, within the spec's "do nothing" rule).
+- [x] ADV/DIS one-tap shortcut now accepts one die with an optional trailing modifier (`LONE_DIE`): `1d20+3` rolls `2d20kh1+3` and leaves the box unchanged; converting the term at the cursor works as before.
+- [x] The "Rolls: ..." preview line is removed (`index.html`, `styles.css`, `previewEl`), since it would only repeat the box.
+- [x] Die keys: a bare number before the cursor counts as a count only when it was just typed with the digit keys; otherwise, with the cursor at the end of a box that has a trailing modifier, a new die goes before the modifier (`2d6+3` from the buttons, then `d8` gives `2d6+1d8+3`).
+- [x] Cache-bust bumped: styles.css?v=5→6, script.js?v=6→7.
 
-**Part 1: a digit after a die key starts a new term**
+**Verification:** Playwright (Chromium), 44 checks, all pass, zero JS errors, 5 seconds.
+- Digits: the reported sequence gives `4d2+2d8+12d12`; `d8` x3 then `5` gives `3d8+5`; the quick key then `2` gives `4d6kh3+2`; the second digit continues (`+25`); `d`,`3`,`0` gives `d30`; `2`,`d6` gives `2d6`; moving the cursor, another key or DEL clears the memory; no plus after `(`.
+- Modifier: the field reads -1, 0, 0, 0, 3, -2 and 0 from `1d6+2d4-1`, `2d6+3d8`, `4d6kh3`, `2*-3`, `2d6+3`, `1d20-2`, `d100+0`; controls disabled for an empty box and for `2d6+`; + x3, - x4 and back to 0 (no `+0`); typing 5, -7 and 0 in the field; clamps at +99 and -99; a hand-typed `+150` is shown, + does nothing and - gives `+149`; CLEAR resets box and field; a roll uses the box text and history shows it (6 for forced 1,2 plus 3).
+- ADV/DIS shortcut on `d20`, `1d20+3` (ADV and DIS) and `d100-2` with the right totals and history, box unchanged; ADV still converts a term at the cursor.
+- Die keys with a modifier: `2d6+3` then `d8`, `d12`, `d8` gives `2d6+1d8+3`, then `+1d12`, then the d8 raised; `2`,`d6`,`+`,`3`,`d8` typed with digit keys gives `2d6+3d8`. Preview line gone. Screenshot reviewed at 360x640.
+- **Earlier test re-run (keypad tightening, 37 of 38 pass):** its one check that expected `2d6+3` (set by filling the box) then `d8` to give `2d6+3d8` now gives `2d6+1d8+3`. That is the intended new rule, not a bug.
+- **Needs a real-device check:** how the box and the modifier field feel together on the phone.
 
-- [ ] Reported: `4`, `d2`, `2`, `d8`, `1`, `2`, `d12` gives `4d22+1d812+1d12`; the intended result is `4d2+2d8+12d12`. Cause: a digit key always types onto the end of the box.
-- [ ] Track "the last tap was a die key or the quick key": after a die key (d2 to d100) or the `4D6KH3` quick key adds or changes text, remember the box text and the cursor position. If the very next tap is a digit key, the text and cursor are unchanged, the cursor is not at the start of the box, and the character before the cursor is not an operator, `(`, `,` or `{`, insert `+` before the digit. Then forget the memory, so the second digit of a number (the `2` in `12`) simply continues it.
-- [ ] Any other tap, typing, moving the cursor, DEL, CLEAR, ADV/DIS, or changing the modifier forgets the memory, so clicking into the middle of the box never adds a surprise `+`.
-- [ ] Unchanged: the `d` key is not a die key for this purpose, so `d`, `3`, `0` still gives `d30`.
-- [ ] Result: `4`, `d2`, `2`, `d8`, `1`, `2`, `d12` gives `4d2+2d8+12d12`; `d8` x3 then `5` gives `3d8+5`; `4D6KH3` then `2` gives `4d6kh3+2`.
+## Build Queue
 
-**Part 2: the final modifier is part of the box**
-
-- [ ] The notation box is the only place the modifier lives. The modifier field (-/+ and number) shows and edits the box's trailing modifier. The separate hidden modifier is removed (`getMod`, `setMod` and `fullExpr` change accordingly); ROLL rolls the box text as it is, and history shows it.
-- [ ] Trailing modifier = a final `+N` or `-N` (N is whole digits) at the very end of the box, where the text before the sign is not empty and does not end in an operator, `(`, `,` or `{`. Examples: `1d6+2d4-1` has modifier -1; `2d6+3d8`, `4d6kh3` and `2*-3` have none; `2d6+3` has +3. The field shows 0 when there is none.
-- [ ] The -/+ buttons change it by 1: they edit the trailing `+N`/`-N` in the box, add `+1` or `-1` if there is none, and remove the term when it reaches 0 (no `+0` left behind). They do nothing when the box is empty or ends in an operator, `(`, `,` or `{`. Typing a number in the field sets the modifier the same way.
-- [ ] Limits: the field and buttons stay within -99 to +99. A larger value typed by hand in the box (`+150`) is left alone and the field shows it; the button that would push it further does nothing and the other brings it down by 1.
-- [ ] The field updates whenever the box changes (typing, keys, DEL, ADV/DIS, history). CLEAR empties the box, so the modifier resets to 0.
-- [ ] ADV/DIS one-tap shortcut: a box that is exactly one die with an optional trailing modifier (`d20`, `1d20+3`, `d100-2`) still rolls the advantage version immediately and leaves the box unchanged, keeping the modifier (`2d20kh1+3`). Converting the term at the cursor works as before.
-- [ ] The "Rolls: ..." preview line, which would now only repeat the box, is removed. *(Added by Claude as a consequence of this design. Change before authorizing if wanted.)*
-- [ ] Die keys and a trailing modifier. A bare number before the cursor counts as a count being typed (`2` then `d6` gives `2d6`) only if the digits were just typed with the digit keys in an unbroken run (cursor not moved, nothing else tapped). Otherwise, with the cursor at the end of a box that has a trailing modifier, a new die key inserts its term before the modifier: `2d6+3` (modifier set with the -/+ buttons) then `d8` gives `2d6+1d8+3`, and further die keys keep building before the modifier. *(Added by Claude. Without it, a modifier set with the buttons would be turned into a die count. Change before authorizing if wanted.)*
-- [ ] Files: `script.js` (digit memory, modifier read/write, die-key rule, ADV shortcut), `index.html` (remove the preview line), `styles.css` (remove its rule). Cache-bust: styles.css?v=5→6, script.js?v=6→7.
-
-Verification plan (targeted, about 1 to 2 minutes): the reported sequence gives `4d2+2d8+12d12`; `d8` x3 then `5` gives `3d8+5`; the quick key then `2`; the second digit continues the number; `d`,`3`,`0` still gives `d30`; moving the cursor or tapping another key clears the memory. Modifier: reading it from `1d6+2d4-1`, `2d6+3d8`, `4d6kh3`, `2*-3`, `2d6+3`, `1d20-2`; the field shows it as the box changes; `+` and `-` buttons add, change and remove it (no `+0`), do nothing on an empty box or after an operator; typing in the field; the 99 limit and a hand-typed `+150`; CLEAR resets the field to 0; a roll uses the box text and the history shows it; ADV/DIS shortcut on `d20`, `1d20+3` and `d100-2`; `2d6+3` then `d8` gives `2d6+1d8+3`, then `d6` gives `2d6+1d8+1d6+3`, while `2`,`d6` still gives `2d6` and `2d6+3` typed with digit keys then `d8` gives `2d6+3d8`; the preview line is gone; zero JS errors; a screenshot. **Needs a real-device check:** how the box and the modifier field feel together on the phone.
+_Empty — nothing queued right now._
 
 ## Build Planner
 
