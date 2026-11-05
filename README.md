@@ -161,6 +161,19 @@ Fixed `4`, `d2`, `2`, `d8`, `1`, `2`, `d12` giving `4d22+1d812+1d12` (it now giv
 - **Earlier test re-run (keypad tightening, 37 of 38 pass):** its one check that expected `2d6+3` (set by filling the box) then `d8` to give `2d6+3d8` now gives `2d6+1d8+3`. That is the intended new rule, not a bug.
 - **Needs a real-device check:** how the box and the modifier field feel together on the phone.
 
+## Build Log 9 (completed)
+### Taller dice roller tray and bigger dice stage
+
+Requested: raise the dice roller card to almost touch the menu button and give the dice more room. CSS only.
+
+- [x] `styles.css`: `#diceTray` max-height changed from 86% of the screen height to the full screen height minus 60px (`calc(100dvh - 60px)`, with a `100vh` fallback line before it). The 60px is 58px of space at the top plus the tray's 2px border, so the tray's top edge sits at 58px, 8px below the menu button (which ends at 50px). The tray bottom is still pinned to the screen bottom.
+- [x] `styles.css`: `#diceStage` height 150px → 220px (222px with its 1px borders), so the dice are larger (about 50% bigger with several dice, up to 80px for a single die). Keys, the pinned box and ROLL are unchanged; ROLL still scrolls the dice into view.
+- [x] Cache-bust bumped: styles.css?v=6→7 (script.js unchanged at v=7).
+
+**Verification:** Playwright (Chromium), 10 checks, all pass, zero JS errors, about 10 seconds. At 412x700, 360x640 and 412x800: the tray top is exactly 58px (8px under the menu button) and its bottom is the screen bottom; the stage is 222px including borders; ROLL is on screen; every key is still at least 32px (smallest 32.1px at 360px wide); the menu button still opens the sidebar with the tray open. A roll with 8 dice scrolls the stage into view. Screenshot of an 8-dice roll reviewed.
+- Two first-run failures were arithmetic on my side (the 2px border put the top at 56px, and the stage borders add 2px); fixed before this entry.
+- **Needs a real-device check:** the gap under the menu button and the dice size on the phone.
+
 ## Build Queue
 
 _Empty — nothing queued right now._
