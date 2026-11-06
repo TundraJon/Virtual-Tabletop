@@ -228,6 +228,17 @@ Queue item C. Keep several encounters by name and move a board between devices. 
 - Bad files (corrupt JSON, wrong version, 201 tokens, over 2 MB) each showed an error ending "Nothing was changed." and left the token in place. Screenshots of the Saves tab and of the letter disks reviewed.
 - **Needs a real-device check:** the export download and the import file picker on Android Chrome.
 
+## Build Log 13 (completed)
+### Shared test helper file
+
+Tooling only; the app is unchanged. A small file of shared plumbing so throwaway test scripts do not rewrite the same setup every session.
+
+- [x] `tests-helpers.js` (repo root, Node only, not loaded by the app): `preflight` (syntax check, stray non-ASCII, cache-bust numbers present), `versions` (the cache-bust numbers for Build Log entries), `serve` (tiny static server), `launch` / `newContext` (phone-size browser with 4 second default timeouts, JS error collection, a dialog policy, forced random values, optional "storage refused" mode, downloads), `force`, `waitSplash`, `touchTools` (real touch: `touch`, `longPress` with the finger still down for menu picks, `drag`), `px` and `near` (canvas pixel reading), `checker` (prints only failures plus one summary line), `png` (flat-color PNG fixtures), and `run` (a hard timeout so a stuck test cannot run for minutes). A header comment shows how to use it. It contains no test scenarios.
+- [x] `CLAUDE.md`: Verification item 1 now allows this one file to be committed (scripts using it stay throwaway), and Fast testing gets item 11 about using it and extending it with plumbing only.
+- [x] No change to `index.html`, `styles.css` or `script.js`, so no cache-bust bump.
+
+**Verification:** a throwaway smoke script that imports the helper and uses every part of it: 8 checks, all pass, zero JS errors, 8 seconds. It ran the preflight and version reader, served the app, launched a phone-size browser, waited for the splash, rolled `2d6` with forced dice (1 and 6 gave 7), made a PNG fixture, did a real long-press that opened the add-token menu, read a canvas pixel, set the dialog policy, and loaded the app in storage-refused mode with no errors.
+
 ## Build Queue
 
 _Empty — nothing queued right now._

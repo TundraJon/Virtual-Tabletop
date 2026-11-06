@@ -51,7 +51,7 @@ A design settled in one sitting can skip the Planner and go straight to the Queu
 
 "Verified" means actually driving the running app, not reading the diff.
 
-1. Write throwaway Playwright scripts in a scratch location. Never commit them.
+1. Write throwaway Playwright scripts in a scratch location. Never commit them. The one exception is `tests-helpers.js` in the repo root: shared plumbing only, with no scenarios (static server, launch with short timeouts and forced random values, touch and long-press helpers, pixel reader, check printer, PNG fixtures, preflight, hard timeout). Test scripts import it.
 2. Register a page-error listener first and print the collected errors at the end. Zero JS errors is a hard bar.
 3. Drive the UI like a real user (click buttons, fill inputs, read the rendered DOM). Don't reach into internal JS state.
 4. Log each check with its expected value next to the actual value.
@@ -76,6 +76,7 @@ Tests must stay inside the time budget: about 10 to 60 seconds for a simple fix,
 8. **Wait on conditions, not fixed delays**, except for animations. Wait for the splash screen to finish before taking screenshots.
 9. **Screenshot only visual claims**, once, and look at it.
 10. **Keep a "needs a real device" list** for what the test cannot prove, and put it in the Build Log entry.
+11. **Use `tests-helpers.js`** for the plumbing instead of rewriting it; its header comment shows how. If a script needs new plumbing, add it to that file (never a scenario) and tell the user.
 
 ## Cache-busting
 
