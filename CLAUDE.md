@@ -62,6 +62,21 @@ A design settled in one sitting can skip the Planner and go straight to the Queu
 9. **Long-press menus:** with the browser's simulated touch, lifting the finger sends a click that closes the menu, so pick the menu item while the finger is still down, then lift.
 10. If something can't be verified here (real touch gestures, long-press, pinch, live network), say so explicitly and flag it for a real-device check. Don't silently skip it.
 
+## Fast testing
+
+Tests must stay inside the time budget: about 10 to 60 seconds for a simple fix, 3 minutes at most for a new feature. If a run goes past the budget, stop and find out why instead of waiting.
+
+1. **Check before the browser.** Run a syntax check on `script.js`, a non-ASCII check and a cache-bust check first. They take about a second and catch most silly errors.
+2. **Short action timeouts.** Set the browser's default timeout to 3 to 5 seconds so a click on a hidden or covered element fails fast instead of waiting 30 seconds. This was the biggest time sink.
+3. **Run in the background with a hard timeout**, output to a file. Print only failures plus one summary line (passes, failures, JS errors, seconds). Do not wait with `sleep`.
+4. **Tiny fast data.** Generate small fixtures (for example 400px flat-color images), force random values with a stub for exact results, turn animations off for instant results, and for statistics loop inside the page and click the real button instead of clicking thousands of times from the test tool.
+5. **Test only the change and its direct neighbors.** If shared code changed, re-run only the checks that use it.
+6. **Reproduce a reported bug first** with the smallest possible script and print a step-by-step trace.
+7. **Test fault or app fault?** When a check fails, decide whether the test expectation is wrong before touching the app. A one-line debug print settles it. Most first-run failures so far were wrong expectations in the test.
+8. **Wait on conditions, not fixed delays**, except for animations. Wait for the splash screen to finish before taking screenshots.
+9. **Screenshot only visual claims**, once, and look at it.
+10. **Keep a "needs a real device" list** for what the test cannot prove, and put it in the Build Log entry.
+
 ## Cache-busting
 
 The app is split into `index.html`, `styles.css` and `script.js`, served directly with no bundler. The two asset tags in `index.html` carry a version query string (`styles.css?v=N`, `script.js?v=N`). Any edit to `styles.css` or `script.js` bumps that file's number by exactly 1 in the same change; a file that did not change keeps its number. The Build Log entry records before and after (`script.js?v=6→7`).
